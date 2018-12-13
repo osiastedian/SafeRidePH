@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "839719557569",
+    "firebase_url": "https://saferideph-1544668683608.firebaseio.com",
+    "project_id": "saferideph-1544668683608",
+    "storage_bucket": "saferideph-1544668683608.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:839719557569:android:134d6d25d545c4bd",
+        "android_client_info": {
+          "package_name": "io.ted.saferideph"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "839719557569-mgb0g1atl2dh9cu0fdp09f9db26daf5p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "io.ted.saferideph",
+            "certificate_hash": "e527c2c1e0fb8879dec0f9fcb5e3f2db38b3b804"
+          }
+        },
+        {
+          "client_id": "839719557569-2rp8h43540r1r9pv3gv77gq9c0t4qugr.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCdl8d5BytJslHELnpHETMF-NJ-wtYju3s"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 2,
+          "other_platform_oauth_client": [
+            {
+              "client_id": "839719557569-2rp8h43540r1r9pv3gv77gq9c0t4qugr.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

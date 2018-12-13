@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#0099cc"
+    tools:context=".MainActivity">
+
+    <!-- The primary full-screen view. This can be replaced with whatever view
+         is needed to present your content, e.g. VideoView, SurfaceView,
+         TextureView, etc. -->
+
+    <!-- This FrameLayout insets its children based on system windows using
+         android:fitsSystemWindows. -->
+    <LinearLayout
+        android:id="@+id/fullscreen_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="10dp">
+
+        <TextView
+            android:id="@+id/textViewLat"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Lattitude:"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/textViewLong"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Longitude:"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/gpsUpdateTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="GPS:"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/netowkrUpdateTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Network:"
+            android:textColor="@android:color/white" />
+
+        <TextView
+            android:id="@+id/speedTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Speed:"
+            android:textColor="@android:color/white" />
+
+        <com.google.android.gms.maps.MapView
+            android:id="@+id/mapView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+
+    </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:fitsSystemWindows="true">
+
+        <LinearLayout
+            android:id="@+id/fullscreen_content_controls"
+            style="?metaButtonBarStyle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:background="@color/black_overlay"
+            android:orientation="horizontal"
+            tools:ignore="UselessParent">
+
+            <Button
+                android:id="@+id/startButton"
+                style="@style/Widget.AppCompat.Button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:onClick="onClick_StartButton"
+                android:text="START" />
+
+            <Button
+                android:id="@+id/stopButton"
+                style="@style/Widget.AppCompat.Button"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:onClick="onClick_StopButton"
+                android:text="STOP" />
+
+        </LinearLayout>
+    </FrameLayout>
+
+</FrameLayout>
