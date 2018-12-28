@@ -4,62 +4,66 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.Bundle;
+import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
-import android.os.Handler;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
+import com.google.android.gms.location.places.GeoDataClient;
+import com.google.android.gms.location.places.PlaceDetectionClient;
+import com.google.android.gms.location.places.PlaceLikelihood;
+import com.google.android.gms.location.places.PlaceLikelihoodBufferResponse;
+import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
-import com.google.android.gms.maps.LocationSource;
 import com.google.android.gms.maps.MapView;
 import com.google.android.gms.maps.OnMapReadyCallback;
+import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.gson.GsonBuilder;
-
-import org.json.JSONArray;
+import com.google.android.gms.maps.model.Polygon;
+import com.google.android.gms.maps.model.PolygonOptions;
+import com.google.android.gms.maps.model.PolylineOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
-/**
- * An example full-screen activity that shows and hides the system UI (i.e.
- * status bar and navigation/system bar) with user interaction.
- */
+import io.ted.saferideph.models.Trip;
+
 public class MainActivity extends AppCompatActivity implements
         ActivityCompat.OnRequestPermissionsResultCallback,
         OnMapReadyCallback,
         GoogleMap.OnMyLocationButtonClickListener,
         GoogleMap.OnMyLocationClickListener,
         GoogleMap.OnCameraMoveListener,
-        LocationListener {
-    /**
-     * Whether or not the system UI should be auto-hidden after
-     * {@link #AUTO_HIDE_DELAY_MILLIS} milliseconds.
-     */
+        LocationListener
+{
     private static final boolean AUTO_HIDE = true;
-
-    /**
-     * If {@link #AUTO_HIDE} is set, the number of milliseconds to wait after
-     * user interaction before hiding the system UI.
-     */
     private static final int AUTO_HIDE_DELAY_MILLIS = 3000;
 
-    /**
-     * Some older devices needs a small delay between UI widget updates
-     * and a change of the status and navigation bar.
-     */
     private static final int UI_ANIMATION_DELAY = 300;
     private final Handler mHideHandler = new Handler();
     private View mContentView;
@@ -67,11 +71,6 @@ public class MainActivity extends AppCompatActivity implements
         @SuppressLint("InlinedApi")
         @Override
         public void run() {
-            // Delayed removal of status and navigation bar
-
-            // Note that some of these constants are new as of API 16 (Jelly Bean)
-            // and API 19 (KitKat). It is safe to use them, as they are inlined
-            // at compile-time and do nothing on earlier devices.
             mContentView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE
                     | View.SYSTEM_UI_FLAG_FULLSCREEN
                     | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
@@ -99,11 +98,6 @@ public class MainActivity extends AppCompatActivity implements
             hide();
         }
     };
-    /**
-     * Touch listener to use for in-layout UI controls to delay hiding the
-     * system UI. This is to prevent the jarring behavior of controls going away
-     * while interacting with activity UI.
-     */
     private final View.OnTouchListener mDelayHideTouchListener = new View.OnTouchListener() {
         @Override
         public boolean onTouch(View view, MotionEvent motionEvent) {
@@ -116,18 +110,43 @@ public class MainActivity extends AppCompatActivity implements
 
     private static final String MAP_VIEW_BUNDLE_KEY = "MapViewBundleKey";
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 10001;
+    private final double SCAN_RADIUS_IN_METERS = 200;
+    private final float ARC_LENGTH = 20;
+    private final double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.75;
 
     private MapView mapView;
     private TextView latText;
     private TextView longText;
     private GoogleMap mMap;
-    MarkerOptions markerOptions = new MarkerOptions();
-    private TextView  gpsUpdateTextView;
+    private TextView gpsUpdateTextView;
     private TextView speedTextView;
     private TextView networkUpdateTextView;
+    private Button startButton;
+    private Button stopButton;
     private long gpsUpdatesCount = 0;
     private long networkUpdatesCount = 0;
     private boolean wentToLocation = false;
+    private boolean isRecording = false;
+    private Trip currentTrip;
+    private Marker myLocation = null;
+
+    private FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
+    private DatabaseReference databaseReference = firebaseDatabase.getReference("trips");
+
+    // Get Places
+    protected GeoDataClient mGeoDataClient;
+    protected PlaceDetectionClient mPlaceDetectionClient;
+
+    Compass compass;
+    Polygon scanArea;
+
+    private float lastAngle;
+    float currentDirection = 0.0f;
+    double distanceTraveled = 0.0f;
+    double distanceCounterForFetch = 0.0f;
+
+    private TextView traveledTextView;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -169,11 +188,60 @@ public class MainActivity extends AppCompatActivity implements
         gpsUpdateTextView = findViewById(R.id.gpsUpdateTextView);
         speedTextView = findViewById(R.id.speedTextView);
         networkUpdateTextView = findViewById(R.id.netowkrUpdateTextView);
+        startButton = findViewById(R.id.startButton);
+        stopButton = findViewById(R.id.stopButton);
+        traveledTextView = findViewById(R.id.traveledTextView);
 
-        markerOptions.title("Your Location");
 
         this.checkLocationPermission();
         this.setUpLocationSource();
+        this.loadTripsValueListener();
+
+        // Get Places
+        mGeoDataClient = Places.getGeoDataClient(this);
+        mPlaceDetectionClient = Places.getPlaceDetectionClient(this);
+
+        this.compass = new Compass(this);
+        compass.setListener(getCompassListener());
+
+    }
+
+    private void getCurrentPlaces() {
+//        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+//            this.checkLocationPermission();
+//        }
+//        mPlaceDetectionClient.getCurrentPlace(null).addOnCompleteListener(new OnCompleteListener<PlaceLikelihoodBufferResponse>() {
+//            @Override
+//            public void onComplete(@NonNull Task<PlaceLikelihoodBufferResponse> task) {
+//                if (task.isSuccessful()) {
+//                    PlaceLikelihoodBufferResponse likelyPlaces = task.getResult();
+//                    for (PlaceLikelihood placeLikelihood : likelyPlaces) {
+//                        Log.i("PLACES", String.format("Place '%s' has likelihood: %g",
+//                                placeLikelihood.getPlace().getName(),
+//                                placeLikelihood.getLikelihood()));
+//                    }
+//                    likelyPlaces.release();
+//                } else {
+//
+//                }
+//            }
+//        });
+        Toast.makeText(this, "Get Current Places", Toast.LENGTH_SHORT).show();
+    }
+
+    private void loadTripsValueListener() {
+        databaseReference.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                Object value = dataSnapshot.getValue();
+                Log.d("Trips Listener", "Value is: " + value);
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.w("Trips Listener", "Failed to read value.", databaseError.toException());
+            }
+        });
     }
 
     private void setUpLocationSource() {
@@ -183,7 +251,40 @@ public class MainActivity extends AppCompatActivity implements
         }
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, this);
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
-        ;
+    }
+
+    private void updateDirection(float angle){
+        Log.i("COMPASS", "Direction: "+angle);
+        if(this.lastLocation == null) return;
+        this.currentDirection = angle;
+        if(this.scanArea != null) {
+            if(Math.floor(this.lastAngle) != angle) {
+                this.scanArea.setPoints(getScanCoordinates(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
+            }
+        }
+        else {
+            this.scanArea = mMap.addPolygon(getScanAreaOptions(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
+        }
+        this.lastAngle = angle;
+
+    }
+
+    private float degreesToRad(float angle) { return (float)(Math.PI / 180 * angle); }
+
+    private Compass.CompassListener getCompassListener() {
+        return new Compass.CompassListener() {
+            @Override
+            public void onNewAzimuth(final float azimuth) {
+                // UI updates only in UI thread
+                // https://stackoverflow.com/q/11140285/444966
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateDirection(azimuth);
+                    }
+                });
+            }
+        };
     }
 
     @Override
@@ -231,29 +332,34 @@ public class MainActivity extends AppCompatActivity implements
     protected void onResume() {
         super.onResume();
         mapView.onResume();
+        compass.start();
     }
 
     @Override
     protected void onStart() {
         super.onStart();
         mapView.onStart();
+        compass.start();
     }
 
     @Override
     protected void onStop() {
         super.onStop();
         mapView.onStop();
+        compass.stop();
     }
 
     @Override
     protected void onPause() {
         mapView.onPause();
+        compass.stop();
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
         mapView.onDestroy();
+        compass.stop();
         super.onDestroy();
     }
 
@@ -291,7 +397,48 @@ public class MainActivity extends AppCompatActivity implements
         mMap.setOnMyLocationClickListener(this);
         mMap.setMinZoomPreference(12);
         mMap.setOnCameraMoveListener(this);
-        mMap.moveCamera(CameraUpdateFactory.zoomBy(6.3f));
+        if (mMap != null) {
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                this.checkLocationPermission();
+                mMap.setMyLocationEnabled(true);
+            }
+            mMap.setMyLocationEnabled(true);
+        }
+    }
+
+    private List<LatLng> getScanCoordinates(Location location, float angle, double radiusInMeters, double arcLength ) {
+        double x[] = {0, 0, 0};
+        double y[] = {0, 0 ,0};
+        radiusInMeters /= 1000; // Meters to KM
+        double radius = radiusInMeters / 110.567;  // KM to POINTS
+
+        x[0] = location.getLatitude();
+        y[0] = location.getLongitude();
+        x[1] = location.getLatitude()  + (radius * Math.cos(Math.PI / 180 * (angle + arcLength/2)));
+        y[1] = location.getLongitude() + (radius * Math.sin(Math.PI / 180 * (angle + arcLength/2)));
+        x[2] = location.getLatitude()  + (radius * Math.cos(Math.PI / 180 * (angle - arcLength/2)));
+        y[2] = location.getLongitude() + (radius * Math.sin(Math.PI / 180 * (angle - arcLength/2)));
+        ArrayList<LatLng> list = new ArrayList<>();
+        for(int i = 0; i < x.length; i++) {
+            list.add(new LatLng(x[i],y[i]));
+        }
+        return list;
+    }
+
+    private final double KM_TO_GPS = 110.567f;
+    private final double METERS_TO_KM = 1000;
+
+    private double gpsPointsToMetes(double gpsPoints) {
+        return gpsPoints * KM_TO_GPS * METERS_TO_KM;
+    }
+
+    private  PolygonOptions getScanAreaOptions(Location location, float angle, double radiusInMeters, double arcLength ) {
+
+        return new PolygonOptions()
+                .addAll(getScanCoordinates(location, angle, radiusInMeters, arcLength))
+                .fillColor(Color.argb(150, 200, 0 ,0 ))
+                .strokeColor(Color.argb(50, 200,0,0))
+                ;
     }
 
     public void checkLocationPermission() {
@@ -318,15 +465,35 @@ public class MainActivity extends AppCompatActivity implements
                 if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
                             == PackageManager.PERMISSION_GRANTED) {
-                        mMap.setMyLocationEnabled(true);
                     }
                 }
             } break;
         }
     }
 
+    private double getDistance(Location firstLoc, Location secondLoc) {
+        return Math.sqrt(
+                Math.pow(firstLoc.getLatitude() - secondLoc.getLatitude(),2) +
+                Math.pow(firstLoc.getLongitude() - secondLoc.getLongitude(),2)
+        );
+    }
+
+    public void updateDistanceTraveled(Location newLocation) {
+        double distance = gpsPointsToMetes(getDistance(this.lastLocation, newLocation));
+        this.distanceTraveled +=  distance;
+        this.distanceCounterForFetch += distance;
+        if(this.distanceCounterForFetch > DISTANCE_COUNTER_FETCH_CAP) {
+            this.distanceCounterForFetch = 0;
+            this.getCurrentPlaces();
+        }
+        traveledTextView.setText(String.format("Traveled: %.2f meters", this.distanceTraveled));
+    }
+
+    Location lastLocation;
     @Override
     public void onLocationChanged(Location location) {
+        if(this.lastLocation != null && location.getSpeed() != 0) { this.updateDistanceTraveled(location); }
+        this.lastLocation = location;
         this.longText.setText("Longitude: "+ location.getLongitude());
         this.latText.setText("Latitude: "+ location.getLatitude());
         String provider = location.getProvider();
@@ -335,17 +502,22 @@ public class MainActivity extends AppCompatActivity implements
         } else if(provider.equals(LocationManager.NETWORK_PROVIDER)) {
             this.networkUpdateTextView.setText("Network:" + (networkUpdatesCount++));
         }
-        this.speedTextView.setText(String.format("Speed %f m/s", location.getSpeed()));
+        this.speedTextView.setText(String.format("%.2f km/h", location.getSpeed() * 3.6));
 
         LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
-        markerOptions.position(latlng);
-        if(!wentToLocation) {
-            mMap.moveCamera(CameraUpdateFactory.newLatLng(latlng));
-            mMap.addMarker(markerOptions);
-            wentToLocation = true;
-        }
 
-        locations.add(location);
+        if(this.myLocation != null) {
+            this.myLocation.remove();
+        }
+        this.myLocation = mMap.addMarker(new MarkerOptions().title("Your Location").position(latlng));
+
+        if(!this.wentToLocation){
+            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).target(latlng).zoom(20).tilt(45).build()));
+            this.wentToLocation = true;
+        } else {
+            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(this.lastAngle).tilt(45).target(latlng).build()));
+        }
+        if(location.getSpeed() != 0) { locations.add(location); }
     }
 
     @Override
@@ -372,14 +544,28 @@ public class MainActivity extends AppCompatActivity implements
 
     public void onClick_StartButton(View view){
         locations.clear();
+        this.isRecording = true;
+        this.currentTrip = new Trip();
+        this.currentTrip.id = Calendar.getInstance().getTime().toString();
+        this.startButton.setEnabled(false);
+        this.stopButton.setEnabled(true);
     }
 
     public void onClick_StopButton(View view){
+        this.startButton.setEnabled(true);
+        this.stopButton.setEnabled(false);
+        FirebaseDatabase database = firebaseDatabase.getInstance();
+        this.isRecording = false;
+        this.currentTrip.locations = locations;
+        DatabaseReference tripDBRef = database.getReference().child("trips").child(this.currentTrip.id);
+        tripDBRef.setValue(this.currentTrip).addOnSuccessListener(
+                new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void aVoid) {
+                        Log.i("Trip", "Update Success");
+                    }
+                }
+        );
 
-        GsonBuilder builder = new GsonBuilder();
-        String temp =builder.create().toJson(locations.toArray());
-        Log.i("LocationJSON", temp );
     }
-
-
 }
