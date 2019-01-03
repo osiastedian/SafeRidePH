@@ -30,6 +30,7 @@ import com.google.android.gms.maps.model.PolygonOptions;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class SafeRide implements
         OnMapReadyCallback,
@@ -76,7 +77,10 @@ public class SafeRide implements
     private SafeRideListener mListener;
     private Compass compass;
 
-    private ArrayList<Circle> nearbyPlaces = new ArrayList<>();
+    private ArrayList<Circle> nearbyPlacesCircles = new ArrayList<>();
+    private ArrayList<Marker> nearbyScannedMarkers = new ArrayList<>();
+    private ArrayList<NearbyPlace> nearbyPlacesCollection = new ArrayList<>();
+
 
     public interface  SafeRideListener {
         void onSpeedChanged(double speed);
@@ -105,6 +109,7 @@ public class SafeRide implements
                 );
             }
         });
+        this.locations = new ArrayList<>();
 
     }
 
@@ -180,7 +185,6 @@ public class SafeRide implements
         for(int i = 0; i < x.length; i++) {
             list.add(new LatLng(x[i],y[i]));
         }
-        this.lastScanArea = list;
         return list;
     }
 
@@ -207,21 +211,30 @@ public class SafeRide implements
     private void getCurrentPlaces() {
 
     }
-
+    private float directionUpdateAngleThreshold = 5;
+//    private float lastRecordAngle = 0.0f;
     private void updateDirection(float angle){
         Log.i("COMPASS", "Direction: "+angle);
-        if(this.lastLocation == null) return;
-        this.currentDirection = angle;
-        if(this.scanArea != null) {
-            if(Math.floor(this.lastAngle) != angle) {
-                this.scanArea.setPoints(getScanCoordinates(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
+        float diff = Math.abs(lastAngle - angle);
+        // Added
+        if( diff > directionUpdateAngleThreshold) {
+            if(this.lastLocation == null) return;
+            currentDirection = angle;
+            lastScanArea = getScanCoordinates(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH);
+            if(this.scanArea != null) {
+                if(Math.floor(this.lastAngle) != angle) {
+                    this.scanArea.setPoints(lastScanArea);
+                }
             }
-        }
-        else {
-            this.scanArea = mMap.addPolygon(getScanAreaOptions(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
-        }
-        this.lastAngle = angle;
+            else {
+                this.scanArea = mMap.addPolygon(getScanAreaOptions(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
+            }
 
+            this.clearNearbyMarkers();
+            this.addNearbyMarkers(null);
+            this.lastAngle = angle;
+
+        }
     }
 
     // Override Methods
@@ -321,21 +334,133 @@ public class SafeRide implements
 
     }
 
-    public void addNearbyMarkers(List<LatLng> places) {
-        for (LatLng pos :
-                places) {
-            CircleOptions options = new CircleOptions().center(pos).radius(5).strokeColor(Color.BLACK).fillColor(Color.BLACK);
-            if(this.lastScanArea != null && isPointOnScanArea(pos, this.lastScanArea)) {
-                options.strokeColor(Color.BLUE).fillColor(Color.BLUE);
+    public void addNearbyMarkers(List<NearbyPlace> places) {
+        if(places != null) {
+            for (NearbyPlace place : places) {
+                if (!nearbyPlacesCollection.contains(place)) {
+                    nearbyPlacesCollection.add(place);
+                }
             }
-            Circle marker = mMap.addCircle(options);
-            nearbyPlaces.add(marker);
+        }
+        // Filter Nearby places within radius
+
+        List<NearbyPlace> filteredNearbyPlaces = nearbyPlacesCollection;
+
+        for (NearbyPlace pos :
+                filteredNearbyPlaces) {
+            if(this.lastScanArea != null && isPointOnScanArea(pos.createLatLng(), this.lastScanArea)) {
+                Marker marker = mMap.addMarker(new MarkerOptions().position(pos.createLatLng()).title(pos.name+"_"+joinStringArray(pos.getTypes(),",")));
+                nearbyScannedMarkers.add(marker);
+            } else {
+                CircleOptions options = new CircleOptions().center(pos.createLatLng()).radius(5).strokeColor(Color.BLACK).fillColor(Color.BLACK);
+                Circle marker = mMap.addCircle(options);
+                nearbyPlacesCircles.add(marker);
+            }
         }
     }
 
+    private String joinStringArray(String[] array, String joiner) {
+        String retString = "";
+        for (int i = 0; i < array.length; i++) {
+            retString += array[i];
+            if(i != array.length - 1) { // not last
+                retString+=joiner;
+            }
+        }
+        return  retString;
+    }
+
+    public NearbyPlace createNearbyPlace(double latitude, double longitude, String name) {
+        return new NearbyPlace(latitude, longitude, name);
+    }
+
+    public class NearbyPlace  {
+        private String id;
+        private double latitude;
+        private double longitude;
+        private String name;
+        private String[] types;
+
+        private NearbyPlace() {
+            this.id = UUID.randomUUID().toString();
+        }
+
+        private NearbyPlace(double latitude, double longitude) {
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.id = UUID.randomUUID().toString();
+        }
+
+        private NearbyPlace(double latitude, double longitude, String name) {
+            this.latitude = latitude;
+            this.longitude = longitude;
+            this.name = name;
+            this.id = UUID.randomUUID().toString();
+        }
+
+        public String getId() {
+            return id;
+        }
+
+        public void setId(String id) {
+            this.id = id;
+        }
+
+        public double getLatitude() {
+            return latitude;
+        }
+
+        public void setLatitude(double latitude) {
+            this.latitude = latitude;
+        }
+
+        public double getLongitude() {
+            return longitude;
+        }
+
+        public void setLongitude(double longitude) {
+            this.longitude = longitude;
+        }
+
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
+        }
+
+        public String[] getTypes() {
+            return types;
+        }
+
+        public void setTypes(String[] types) {
+            this.types = types;
+        }
+
+        public LatLng createLatLng() {
+            return new LatLng(latitude, longitude);
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if(!(obj instanceof NearbyPlace)) {
+                return  false;
+            }
+            NearbyPlace param = (NearbyPlace)obj;
+            return (param.id == this.id) || (param.latitude == latitude && param.longitude == longitude);
+        }
+    }
+
+
     public void clearNearbyMarkers() {
         for (Circle place :
-                nearbyPlaces) {
+                nearbyPlacesCircles) {
+            place.remove();
+        }
+
+        for (Marker place :
+                nearbyScannedMarkers) {
             place.remove();
         }
     }

@@ -1,7 +1,6 @@
 package io.ted.saferideph;
 
 import android.annotation.SuppressLint;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
@@ -27,11 +26,6 @@ import com.google.android.gms.location.places.PlaceDetectionClient;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
-import com.google.android.gms.maps.model.Circle;
-import com.google.android.gms.maps.model.CircleOptions;
-import com.google.android.gms.maps.model.LatLng;
-import com.google.android.gms.maps.model.Marker;
-import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -204,7 +198,7 @@ public class MainActivity extends AppCompatActivity implements
         String url = baseUrl +
                 "location="+safeRide.lastLocation.getLatitude()+","+ safeRide.lastLocation.getLongitude()+
                 "&radius=300" +
-                "&type=restaurant" +
+//                "&type=store" +
                 "&key=" + key;
         if(pageToken != null) {
             url = baseUrl + "pagetoken="+ pageToken + "&key=" + key;
@@ -216,13 +210,22 @@ public class MainActivity extends AppCompatActivity implements
                 try {
                     String nextPageToken = response.getString("next_page_token");
                     JSONArray results = response.getJSONArray("results");
-                    final ArrayList<LatLng> places = new ArrayList<>();
-                    for(int i = 0; i < 5; i++) {
-                        JSONObject geometry = results.getJSONObject(i).getJSONObject("geometry");
+                    ArrayList<SafeRide.NearbyPlace> places = new ArrayList<>();
+                    for(int i = 0; i < results.length() ; i++) {
+                        JSONObject result = results.getJSONObject(i);
+                        JSONObject geometry = result.getJSONObject("geometry");
                         JSONObject location = geometry.getJSONObject("location");
                         double latitude = location.getDouble("lat");
                         double longitude = location.getDouble("lng");
-                        places.add(new LatLng(latitude, longitude));
+                        String name = result.getString("name");
+                        ArrayList<String> types = new ArrayList<>();
+                        JSONArray typesJson = result.getJSONArray("types");
+                        for(int typesIndex = 0; typesIndex < typesJson.length(); typesIndex++) {
+                            types.add(typesJson.getString(typesIndex));
+                        }
+                        SafeRide.NearbyPlace place = safeRide.createNearbyPlace(latitude, longitude, name);
+                        place.setTypes(types.toArray(new String[types.size()]));
+                        places.add(place);
                     }
                     safeRide.addNearbyMarkers(places);
                     if(nextPageToken != null && nextPageToken.length() > 0) {
