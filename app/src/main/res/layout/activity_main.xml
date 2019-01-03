@@ -23,6 +23,16 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
+        <SeekBar
+            android:id="@+id/zoomSeekBar"
+            style="@style/Widget.AppCompat.SeekBar.Discrete"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_above="@+id/locationDetailsCard"
+            android:layout_marginBottom="0dp"
+            android:max="10"
+            android:progress="0" />
+
         <android.support.v7.widget.CardView
             android:id="@+id/speedCard"
             android:layout_width="match_parent"
@@ -46,7 +56,7 @@
                 android:id="@+id/traveledTextView"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Traveled: 20m" />
+                android:text="Traveled: 0.0m" />
         </android.support.v7.widget.CardView>
 
         <android.support.v7.widget.CardView
@@ -130,6 +140,14 @@
                 android:layout_weight="1"
                 android:onClick="onClick_StopButton"
                 android:text="STOP" />
+
+            <Button
+                android:id="@+id/testButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:onClick="onTest"
+                android:text="TEST" />
 
         </LinearLayout>
     </FrameLayout>

@@ -1,65 +1,52 @@
 package io.ted.saferideph;
 
-import android.Manifest;
 import android.annotation.SuppressLint;
-import android.content.Context;
-import android.content.pm.PackageManager;
 import android.graphics.Color;
-import android.location.Location;
-import android.location.LocationListener;
-import android.location.LocationManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.Volley;
 import com.google.android.gms.location.places.GeoDataClient;
 import com.google.android.gms.location.places.PlaceDetectionClient;
-import com.google.android.gms.location.places.PlaceLikelihood;
-import com.google.android.gms.location.places.PlaceLikelihoodBufferResponse;
 import com.google.android.gms.location.places.Places;
-import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
-import com.google.android.gms.maps.OnMapReadyCallback;
-import com.google.android.gms.maps.model.CameraPosition;
+import com.google.android.gms.maps.model.Circle;
+import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.Polygon;
-import com.google.android.gms.maps.model.PolygonOptions;
-import com.google.android.gms.maps.model.PolylineOptions;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
-import io.ted.saferideph.models.Trip;
+import java.util.ArrayList;
 
 public class MainActivity extends AppCompatActivity implements
         ActivityCompat.OnRequestPermissionsResultCallback,
-        OnMapReadyCallback,
-        GoogleMap.OnMyLocationButtonClickListener,
-        GoogleMap.OnMyLocationClickListener,
-        GoogleMap.OnCameraMoveListener,
-        LocationListener
+        SeekBar.OnSeekBarChangeListener
 {
     private static final boolean AUTO_HIDE = true;
     private static final int AUTO_HIDE_DELAY_MILLIS = 3000;
@@ -121,14 +108,9 @@ public class MainActivity extends AppCompatActivity implements
     private TextView gpsUpdateTextView;
     private TextView speedTextView;
     private TextView networkUpdateTextView;
+    private TextView traveledTextView;
     private Button startButton;
     private Button stopButton;
-    private long gpsUpdatesCount = 0;
-    private long networkUpdatesCount = 0;
-    private boolean wentToLocation = false;
-    private boolean isRecording = false;
-    private Trip currentTrip;
-    private Marker myLocation = null;
 
     private FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
     private DatabaseReference databaseReference = firebaseDatabase.getReference("trips");
@@ -138,14 +120,10 @@ public class MainActivity extends AppCompatActivity implements
     protected PlaceDetectionClient mPlaceDetectionClient;
 
     Compass compass;
-    Polygon scanArea;
+    SafeRide safeRide;
 
-    private float lastAngle;
-    float currentDirection = 0.0f;
-    double distanceTraveled = 0.0f;
-    double distanceCounterForFetch = 0.0f;
+    private SeekBar zoomSeekBar;
 
-    private TextView traveledTextView;
 
 
     @Override
@@ -180,7 +158,6 @@ public class MainActivity extends AppCompatActivity implements
 
         mapView = findViewById(R.id.mapView);
         mapView.onCreate(mapViewBundle);
-        mapView.getMapAsync(this);
 
 
         latText = findViewById(R.id.textViewLat);
@@ -191,10 +168,9 @@ public class MainActivity extends AppCompatActivity implements
         startButton = findViewById(R.id.startButton);
         stopButton = findViewById(R.id.stopButton);
         traveledTextView = findViewById(R.id.traveledTextView);
+        zoomSeekBar = findViewById(R.id.zoomSeekBar);
+        zoomSeekBar.setOnSeekBarChangeListener(this);
 
-
-        this.checkLocationPermission();
-        this.setUpLocationSource();
         this.loadTripsValueListener();
 
         // Get Places
@@ -202,30 +178,71 @@ public class MainActivity extends AppCompatActivity implements
         mPlaceDetectionClient = Places.getPlaceDetectionClient(this);
 
         this.compass = new Compass(this);
-        compass.setListener(getCompassListener());
-
+        this.safeRide = new SafeRide(this, mapView, compass);
+        this.safeRide.onCreate();
     }
 
-    private void getCurrentPlaces() {
-//        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-//            this.checkLocationPermission();
-//        }
-//        mPlaceDetectionClient.getCurrentPlace(null).addOnCompleteListener(new OnCompleteListener<PlaceLikelihoodBufferResponse>() {
-//            @Override
-//            public void onComplete(@NonNull Task<PlaceLikelihoodBufferResponse> task) {
-//                if (task.isSuccessful()) {
-//                    PlaceLikelihoodBufferResponse likelyPlaces = task.getResult();
-//                    for (PlaceLikelihood placeLikelihood : likelyPlaces) {
-//                        Log.i("PLACES", String.format("Place '%s' has likelihood: %g",
-//                                placeLikelihood.getPlace().getName(),
-//                                placeLikelihood.getLikelihood()));
-//                    }
-//                    likelyPlaces.release();
-//                } else {
-//
-//                }
-//            }
-//        });
+    public void onTest(View view) {
+        this.getCurrentPlaces();
+    }
+    public void getCurrentPlaces() {
+        currentPagesLoaded = 0;
+        this.safeRide.clearNearbyMarkers();
+        this.getCurrentPlaces(null);
+    }
+
+    public int currentPagesLoaded = 0;
+
+    public void getCurrentPlaces(String pageToken) {
+        if(currentPagesLoaded > 10) {
+            return;
+        }
+        RequestQueue queue = Volley.newRequestQueue(this);
+
+        String key = "AIzaSyASG1Kwhyrz8XTJdJsGfKDJ8XYby-rjNMs";
+        String baseUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?";
+        String url = baseUrl +
+                "location="+safeRide.lastLocation.getLatitude()+","+ safeRide.lastLocation.getLongitude()+
+                "&radius=300" +
+                "&type=restaurant" +
+                "&key=" + key;
+        if(pageToken != null) {
+            url = baseUrl + "pagetoken="+ pageToken + "&key=" + key;
+        }
+        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject response) {
+                String responseStr = response.toString();
+                try {
+                    String nextPageToken = response.getString("next_page_token");
+                    JSONArray results = response.getJSONArray("results");
+                    final ArrayList<LatLng> places = new ArrayList<>();
+                    for(int i = 0; i < 5; i++) {
+                        JSONObject geometry = results.getJSONObject(i).getJSONObject("geometry");
+                        JSONObject location = geometry.getJSONObject("location");
+                        double latitude = location.getDouble("lat");
+                        double longitude = location.getDouble("lng");
+                        places.add(new LatLng(latitude, longitude));
+                    }
+                    safeRide.addNearbyMarkers(places);
+                    if(nextPageToken != null && nextPageToken.length() > 0) {
+                        currentPagesLoaded++;
+                        getCurrentPlaces(nextPageToken);
+                    }
+
+
+                } catch (JSONException exception) {
+
+                }
+                Log.i("Current Places", responseStr);
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.e("Current Places", error.getMessage());
+            }
+        });
+        queue.add(request);
         Toast.makeText(this, "Get Current Places", Toast.LENGTH_SHORT).show();
     }
 
@@ -244,56 +261,9 @@ public class MainActivity extends AppCompatActivity implements
         });
     }
 
-    private void setUpLocationSource() {
-        LocationManager locationManager = (LocationManager) this.getSystemService(Context.LOCATION_SERVICE);
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            this.checkLocationPermission();
-        }
-        locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0, this);
-        locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
-    }
-
-    private void updateDirection(float angle){
-        Log.i("COMPASS", "Direction: "+angle);
-        if(this.lastLocation == null) return;
-        this.currentDirection = angle;
-        if(this.scanArea != null) {
-            if(Math.floor(this.lastAngle) != angle) {
-                this.scanArea.setPoints(getScanCoordinates(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
-            }
-        }
-        else {
-            this.scanArea = mMap.addPolygon(getScanAreaOptions(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
-        }
-        this.lastAngle = angle;
-
-    }
-
-    private float degreesToRad(float angle) { return (float)(Math.PI / 180 * angle); }
-
-    private Compass.CompassListener getCompassListener() {
-        return new Compass.CompassListener() {
-            @Override
-            public void onNewAzimuth(final float azimuth) {
-                // UI updates only in UI thread
-                // https://stackoverflow.com/q/11140285/444966
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        updateDirection(azimuth);
-                    }
-                });
-            }
-        };
-    }
-
     @Override
     protected void onPostCreate(Bundle savedInstanceState) {
         super.onPostCreate(savedInstanceState);
-
-        // Trigger the initial hide() shortly after the activity has been
-        // created, to briefly hint to the user that UI controls
-        // are available.
         delayedHide(100);
     }
 
@@ -391,181 +361,19 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
-    public void onMapReady(GoogleMap googleMap) {
-        mMap = googleMap;
-        mMap.setOnMyLocationButtonClickListener(this);
-        mMap.setOnMyLocationClickListener(this);
-        mMap.setMinZoomPreference(12);
-        mMap.setOnCameraMoveListener(this);
-        if (mMap != null) {
-            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                this.checkLocationPermission();
-                mMap.setMyLocationEnabled(true);
-            }
-            mMap.setMyLocationEnabled(true);
-        }
-    }
-
-    private List<LatLng> getScanCoordinates(Location location, float angle, double radiusInMeters, double arcLength ) {
-        double x[] = {0, 0, 0};
-        double y[] = {0, 0 ,0};
-        radiusInMeters /= 1000; // Meters to KM
-        double radius = radiusInMeters / 110.567;  // KM to POINTS
-
-        x[0] = location.getLatitude();
-        y[0] = location.getLongitude();
-        x[1] = location.getLatitude()  + (radius * Math.cos(Math.PI / 180 * (angle + arcLength/2)));
-        y[1] = location.getLongitude() + (radius * Math.sin(Math.PI / 180 * (angle + arcLength/2)));
-        x[2] = location.getLatitude()  + (radius * Math.cos(Math.PI / 180 * (angle - arcLength/2)));
-        y[2] = location.getLongitude() + (radius * Math.sin(Math.PI / 180 * (angle - arcLength/2)));
-        ArrayList<LatLng> list = new ArrayList<>();
-        for(int i = 0; i < x.length; i++) {
-            list.add(new LatLng(x[i],y[i]));
-        }
-        return list;
-    }
-
-    private final double KM_TO_GPS = 110.567f;
-    private final double METERS_TO_KM = 1000;
-
-    private double gpsPointsToMetes(double gpsPoints) {
-        return gpsPoints * KM_TO_GPS * METERS_TO_KM;
-    }
-
-    private  PolygonOptions getScanAreaOptions(Location location, float angle, double radiusInMeters, double arcLength ) {
-
-        return new PolygonOptions()
-                .addAll(getScanCoordinates(location, angle, radiusInMeters, arcLength))
-                .fillColor(Color.argb(150, 200, 0 ,0 ))
-                .strokeColor(Color.argb(50, 200,0,0))
-                ;
-    }
-
-    public void checkLocationPermission() {
-
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, MY_PERMISSIONS_REQUEST_LOCATION );
-        }
+    public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+        this.safeRide.setZoomPreference(10 + progress);
     }
 
     @Override
-    public boolean onMyLocationButtonClick() {
-        return false;
-    }
-
-    @Override
-    public void onMyLocationClick(@NonNull Location location) {
+    public void onStartTrackingTouch(SeekBar seekBar) {
 
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_LOCATION: {
-                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                            == PackageManager.PERMISSION_GRANTED) {
-                    }
-                }
-            } break;
-        }
-    }
-
-    private double getDistance(Location firstLoc, Location secondLoc) {
-        return Math.sqrt(
-                Math.pow(firstLoc.getLatitude() - secondLoc.getLatitude(),2) +
-                Math.pow(firstLoc.getLongitude() - secondLoc.getLongitude(),2)
-        );
-    }
-
-    public void updateDistanceTraveled(Location newLocation) {
-        double distance = gpsPointsToMetes(getDistance(this.lastLocation, newLocation));
-        this.distanceTraveled +=  distance;
-        this.distanceCounterForFetch += distance;
-        if(this.distanceCounterForFetch > DISTANCE_COUNTER_FETCH_CAP) {
-            this.distanceCounterForFetch = 0;
-            this.getCurrentPlaces();
-        }
-        traveledTextView.setText(String.format("Traveled: %.2f meters", this.distanceTraveled));
-    }
-
-    Location lastLocation;
-    @Override
-    public void onLocationChanged(Location location) {
-        if(this.lastLocation != null && location.getSpeed() != 0) { this.updateDistanceTraveled(location); }
-        this.lastLocation = location;
-        this.longText.setText("Longitude: "+ location.getLongitude());
-        this.latText.setText("Latitude: "+ location.getLatitude());
-        String provider = location.getProvider();
-        if(provider.equals(LocationManager.GPS_PROVIDER)) {
-            this.gpsUpdateTextView.setText("GPS" + (gpsUpdatesCount++));
-        } else if(provider.equals(LocationManager.NETWORK_PROVIDER)) {
-            this.networkUpdateTextView.setText("Network:" + (networkUpdatesCount++));
-        }
-        this.speedTextView.setText(String.format("%.2f km/h", location.getSpeed() * 3.6));
-
-        LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
-
-        if(this.myLocation != null) {
-            this.myLocation.remove();
-        }
-        this.myLocation = mMap.addMarker(new MarkerOptions().title("Your Location").position(latlng));
-
-        if(!this.wentToLocation){
-            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).target(latlng).zoom(20).tilt(45).build()));
-            this.wentToLocation = true;
-        } else {
-            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(this.lastAngle).tilt(45).target(latlng).build()));
-        }
-        if(location.getSpeed() != 0) { locations.add(location); }
-    }
-
-    @Override
-    public void onStatusChanged(String provider, int status, Bundle extras) {
+    public void onStopTrackingTouch(SeekBar seekBar) {
 
     }
 
-    @Override
-    public void onProviderEnabled(String provider) {
-
-    }
-
-    @Override
-    public void onProviderDisabled(String provider) {
-
-    }
-
-    @Override
-    public void onCameraMove() {
-        Log.i("Camera", mMap.getCameraPosition().toString());
-    }
-
-    ArrayList<Location> locations = new ArrayList<>();
-
-    public void onClick_StartButton(View view){
-        locations.clear();
-        this.isRecording = true;
-        this.currentTrip = new Trip();
-        this.currentTrip.id = Calendar.getInstance().getTime().toString();
-        this.startButton.setEnabled(false);
-        this.stopButton.setEnabled(true);
-    }
-
-    public void onClick_StopButton(View view){
-        this.startButton.setEnabled(true);
-        this.stopButton.setEnabled(false);
-        FirebaseDatabase database = firebaseDatabase.getInstance();
-        this.isRecording = false;
-        this.currentTrip.locations = locations;
-        DatabaseReference tripDBRef = database.getReference().child("trips").child(this.currentTrip.id);
-        tripDBRef.setValue(this.currentTrip).addOnSuccessListener(
-                new OnSuccessListener<Void>() {
-                    @Override
-                    public void onSuccess(Void aVoid) {
-                        Log.i("Trip", "Update Success");
-                    }
-                }
-        );
-
-    }
 }
+
