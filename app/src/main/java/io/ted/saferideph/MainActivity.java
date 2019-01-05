@@ -1,6 +1,7 @@
 package io.ted.saferideph;
 
 import android.annotation.SuppressLint;
+import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
@@ -115,6 +116,7 @@ public class MainActivity extends AppCompatActivity implements
 
     Compass compass;
     SafeRide safeRide;
+    WarningSystem warningSystem;
 
     private SeekBar zoomSeekBar;
 
@@ -172,82 +174,31 @@ public class MainActivity extends AppCompatActivity implements
         mPlaceDetectionClient = Places.getPlaceDetectionClient(this);
 
         this.compass = new Compass(this);
-        this.safeRide = new SafeRide(this, mapView, compass);
+        this.warningSystem = new WarningSystem(this);
+        this.safeRide = new SafeRide(this, mapView, compass, warningSystem);
         this.safeRide.onCreate();
     }
 
     public void onTest(View view) {
-        this.getCurrentPlaces();
-    }
-    public void getCurrentPlaces() {
-        currentPagesLoaded = 0;
-        this.safeRide.clearNearbyMarkers();
-        this.getCurrentPlaces(null);
+//        warningSystem.newSpeedLimit(40);
+        warningSystem.speedingWarning(40, 35);
+//        this.playWarningSound();
     }
 
-    public int currentPagesLoaded = 0;
-
-    public void getCurrentPlaces(String pageToken) {
-        if(currentPagesLoaded > 10) {
-            return;
-        }
-        RequestQueue queue = Volley.newRequestQueue(this);
-
-        String key = "AIzaSyASG1Kwhyrz8XTJdJsGfKDJ8XYby-rjNMs";
-        String baseUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?";
-        String url = baseUrl +
-                "location="+safeRide.lastLocation.getLatitude()+","+ safeRide.lastLocation.getLongitude()+
-                "&radius=300" +
-//                "&type=store" +
-                "&key=" + key;
-        if(pageToken != null) {
-            url = baseUrl + "pagetoken="+ pageToken + "&key=" + key;
-        }
-        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
-            @Override
-            public void onResponse(JSONObject response) {
-                String responseStr = response.toString();
-                try {
-                    String nextPageToken = response.getString("next_page_token");
-                    JSONArray results = response.getJSONArray("results");
-                    ArrayList<SafeRide.NearbyPlace> places = new ArrayList<>();
-                    for(int i = 0; i < results.length() ; i++) {
-                        JSONObject result = results.getJSONObject(i);
-                        JSONObject geometry = result.getJSONObject("geometry");
-                        JSONObject location = geometry.getJSONObject("location");
-                        double latitude = location.getDouble("lat");
-                        double longitude = location.getDouble("lng");
-                        String name = result.getString("name");
-                        ArrayList<String> types = new ArrayList<>();
-                        JSONArray typesJson = result.getJSONArray("types");
-                        for(int typesIndex = 0; typesIndex < typesJson.length(); typesIndex++) {
-                            types.add(typesJson.getString(typesIndex));
-                        }
-                        SafeRide.NearbyPlace place = safeRide.createNearbyPlace(latitude, longitude, name);
-                        place.setTypes(types.toArray(new String[types.size()]));
-                        places.add(place);
-                    }
-                    safeRide.addNearbyMarkers(places);
-                    if(nextPageToken != null && nextPageToken.length() > 0) {
-                        currentPagesLoaded++;
-                        getCurrentPlaces(nextPageToken);
-                    }
 
 
-                } catch (JSONException exception) {
+    public void playWarningSound() {
+        if(warningSystem != null)
+//        byte[] data = warningSystem.textToSpeech("Hello World!");
+//        MediaPlayer.
+        warningSystem.getSlowUpComing("restaurant", 100);
 
-                }
-                Log.i("Current Places", responseStr);
-            }
-        }, new Response.ErrorListener() {
-            @Override
-            public void onErrorResponse(VolleyError error) {
-                Log.e("Current Places", error.getMessage());
-            }
-        });
-        queue.add(request);
-        Toast.makeText(this, "Get Current Places", Toast.LENGTH_SHORT).show();
     }
+
+    public void playSchoolZoneAhead() {
+
+    }
+
 
     private void loadTripsValueListener() {
         databaseReference.addValueEventListener(new ValueEventListener() {

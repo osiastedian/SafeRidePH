@@ -13,7 +13,14 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
+import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.Volley;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.LocationSource;
@@ -27,6 +34,10 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.PolygonOptions;
+
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,6 +87,7 @@ public class SafeRide implements
 
     private SafeRideListener mListener;
     private Compass compass;
+    private WarningSystem warningSystem;
 
     private ArrayList<Circle> nearbyPlacesCircles = new ArrayList<>();
     private ArrayList<Marker> nearbyScannedMarkers = new ArrayList<>();
@@ -91,11 +103,12 @@ public class SafeRide implements
         void onDistanceTraveled(double distance);
     }
 
-    public SafeRide(final Activity activity, MapView mapView, Compass compass) {
+    public SafeRide(final Activity activity, MapView mapView, Compass compass, WarningSystem warningSystem) {
         this.ownerActivity = activity;
         this.context = activity;
         this.mapView = mapView;
         this.compass = compass;
+        this.warningSystem = warningSystem;
         this.compass.setListener(new Compass.CompassListener() {
             @Override
             public void onNewAzimuth(final float azimuth) {
@@ -137,7 +150,79 @@ public class SafeRide implements
 
     }
 
+    public int currentPagesLoaded = 0;
+
+    public void getCurrentPlaces() {
+        currentPagesLoaded = 0;
+        this.clearNearbyMarkers();
+        this.getCurrentPlaces(null);
+    }
+
+    public void getCurrentPlaces(String pageToken) {
+        if(currentPagesLoaded > 10) {
+            return;
+        }
+        RequestQueue queue = Volley.newRequestQueue(ownerActivity);
+
+        String key = "AIzaSyASG1Kwhyrz8XTJdJsGfKDJ8XYby-rjNMs";
+        String baseUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?";
+        String url = baseUrl +
+                "location="+lastLocation.getLatitude()+","+ lastLocation.getLongitude()+
+                "&radius=300" +
+//                "&type=store" +
+                "&key=" + key;
+        if(pageToken != null) {
+            url = baseUrl + "pagetoken="+ pageToken + "&key=" + key;
+        }
+        JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject response) {
+                String responseStr = response.toString();
+                try {
+                    String nextPageToken = response.getString("next_page_token");
+                    JSONArray results = response.getJSONArray("results");
+                    ArrayList<SafeRide.NearbyPlace> places = new ArrayList<>();
+                    for(int i = 0; i < results.length() ; i++) {
+                        JSONObject result = results.getJSONObject(i);
+                        JSONObject geometry = result.getJSONObject("geometry");
+                        JSONObject location = geometry.getJSONObject("location");
+                        double latitude = location.getDouble("lat");
+                        double longitude = location.getDouble("lng");
+                        String name = result.getString("name");
+                        ArrayList<String> types = new ArrayList<>();
+                        JSONArray typesJson = result.getJSONArray("types");
+                        for(int typesIndex = 0; typesIndex < typesJson.length(); typesIndex++) {
+                            types.add(typesJson.getString(typesIndex));
+                        }
+                        SafeRide.NearbyPlace place = createNearbyPlace(latitude, longitude, name);
+                        place.setTypes(types.toArray(new String[types.size()]));
+                        places.add(place);
+                    }
+                    addNearbyMarkers(places);
+                    if(nextPageToken != null && nextPageToken.length() > 0) {
+                        currentPagesLoaded++;
+                        getCurrentPlaces(nextPageToken);
+                    }
+
+
+                } catch (JSONException exception) {
+
+                }
+                Log.i("Current Places", responseStr);
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.e("Current Places", error.getMessage());
+            }
+        });
+        queue.add(request);
+        Toast.makeText(ownerActivity, "Get Current Places", Toast.LENGTH_SHORT).show();
+    }
+
+
     // Helper Methods
+
 
     private void checkLocationPermission() {
 
@@ -150,6 +235,13 @@ public class SafeRide implements
         return Math.sqrt(
                 Math.pow(firstLoc.getLatitude() - secondLoc.getLatitude(),2) +
                         Math.pow(firstLoc.getLongitude() - secondLoc.getLongitude(),2)
+        );
+    }
+
+    private double getDistance(NearbyPlace nearbyPlace, Location location) {
+        return Math.sqrt(
+                Math.pow(nearbyPlace.getLatitude() - location.getLatitude(),2) +
+                        Math.pow(nearbyPlace.getLongitude() - location.getLongitude(),2)
         );
     }
 
@@ -196,7 +288,6 @@ public class SafeRide implements
                 .strokeColor(Color.argb(50, 200,0,0))
                 ;
     }
-
     private void updateDistanceTraveled(Location newLocation) {
         double distance = gpsPointsToMetes(getDistance(this.lastLocation, newLocation));
         this.distanceTraveled +=  distance;
@@ -207,12 +298,9 @@ public class SafeRide implements
         }
         if(mListener != null) { mListener.onDistanceTraveled(this.distanceTraveled); }
     }
-
-    private void getCurrentPlaces() {
-
-    }
     private float directionUpdateAngleThreshold = 5;
 //    private float lastRecordAngle = 0.0f;
+
     private void updateDirection(float angle){
         Log.i("COMPASS", "Direction: "+angle);
         float diff = Math.abs(lastAngle - angle);
@@ -220,7 +308,7 @@ public class SafeRide implements
         if( diff > directionUpdateAngleThreshold) {
             if(this.lastLocation == null) return;
             currentDirection = angle;
-            lastScanArea = getScanCoordinates(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH);
+            lastScanArea = getScanCoordinates(this.lastLocation, currentDirection, SCAN_RADIUS_IN_METERS, ARC_LENGTH);
             if(this.scanArea != null) {
                 if(Math.floor(this.lastAngle) != angle) {
                     this.scanArea.setPoints(lastScanArea);
@@ -236,8 +324,8 @@ public class SafeRide implements
 
         }
     }
-
     // Override Methods
+
 
     @Override
     public void onMapReady(GoogleMap googleMap) {
@@ -305,6 +393,7 @@ public class SafeRide implements
 
         if(!this.firstAnimateFinished){
             mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).target(latlng).zoom(this.zoomPreference).tilt(45).build()));
+            this.getCurrentPlaces();
             this.firstAnimateFinished = true;
         } else {
             mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(this.lastAngle).tilt(45).target(latlng).build()));
@@ -349,6 +438,7 @@ public class SafeRide implements
         for (NearbyPlace pos :
                 filteredNearbyPlaces) {
             if(this.lastScanArea != null && isPointOnScanArea(pos.createLatLng(), this.lastScanArea)) {
+                processScannedPlaces(pos);
                 Marker marker = mMap.addMarker(new MarkerOptions().position(pos.createLatLng()).title(pos.name+"_"+joinStringArray(pos.getTypes(),",")));
                 nearbyScannedMarkers.add(marker);
             } else {
@@ -357,6 +447,12 @@ public class SafeRide implements
                 nearbyPlacesCircles.add(marker);
             }
         }
+    }
+
+    private void processScannedPlaces(NearbyPlace place) {
+        double distance = getDistance(place, this.lastLocation);
+        distance = gpsPointsToMetes(distance);
+        warningSystem.getSlowUpComing(place.name, distance);
     }
 
     private String joinStringArray(String[] array, String joiner) {
@@ -373,6 +469,34 @@ public class SafeRide implements
     public NearbyPlace createNearbyPlace(double latitude, double longitude, String name) {
         return new NearbyPlace(latitude, longitude, name);
     }
+
+
+
+    public void clearNearbyMarkers() {
+        for (Circle place :
+                nearbyPlacesCircles) {
+            place.remove();
+        }
+
+        for (Marker place :
+                nearbyScannedMarkers) {
+            place.remove();
+        }
+    }
+
+    private boolean isPointOnScanArea(LatLng loc, List<LatLng> scanArea) {
+        LatLng p2 = scanArea.get(scanArea.size() - 1);
+        boolean result = false;
+        for (LatLng p1 :
+                scanArea) {
+            if ((p1.longitude > loc.longitude) != (p2.longitude > loc.longitude) &&
+                    (loc.latitude < (p2.latitude - p1.latitude) * (loc.longitude - p1.longitude) / (p2.longitude-p1.longitude) + p1.latitude)) {
+                result = !result;
+            }
+        }
+        return result;
+    }
+
 
     public class NearbyPlace  {
         private String id;
@@ -452,30 +576,5 @@ public class SafeRide implements
         }
     }
 
-
-    public void clearNearbyMarkers() {
-        for (Circle place :
-                nearbyPlacesCircles) {
-            place.remove();
-        }
-
-        for (Marker place :
-                nearbyScannedMarkers) {
-            place.remove();
-        }
-    }
-    
-    private boolean isPointOnScanArea(LatLng loc, List<LatLng> scanArea) {
-        LatLng p2 = scanArea.get(scanArea.size() - 1);
-        boolean result = false;
-        for (LatLng p1 :
-                scanArea) {
-            if ((p1.longitude > loc.longitude) != (p2.longitude > loc.longitude) &&
-                    (loc.latitude < (p2.latitude - p1.latitude) * (loc.longitude - p1.longitude) / (p2.longitude-p1.longitude) + p1.latitude)) {
-                result = !result;
-            }
-        }
-        return result;
-    }
 
 }
