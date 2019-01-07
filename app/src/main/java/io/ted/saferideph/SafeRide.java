@@ -76,6 +76,7 @@ public class SafeRide implements
     public Location lastLocation;
     private float lastAngle = 0.0f;
     private List<LatLng> lastScanArea;
+    private double lastSpeed;  // km/h
 
     private float currentDirection = 0.0f;
     private long gpsUpdatesCount = 0;
@@ -406,7 +407,8 @@ public class SafeRide implements
 
     @Override
     public void onLocationChanged(Location location) {
-        if(this.lastLocation != null && location.getSpeed() != 0) {
+        lastSpeed = location.getSpeed() * 3.6; // km/h
+        if(this.lastLocation != null && lastSpeed != 0) {
             this.updateDistanceTraveled(location);
         }
         this.lastLocation = location;
@@ -485,24 +487,78 @@ public class SafeRide implements
     }
 
     private void processScannedPlaces(ArrayList<NearbyPlace> places) {
-        NearbyPlace nearbyPlaceHighestScore = null;
+        NearbyPlace mostPopulatedPlace = null;
+        NearbyPlace nearestPlace = null;
         long highestScore = 0;
+        double nearestPlaceDistance = 0;
+
         long totalScore = 0;
         for (NearbyPlace place : places) {
             long tempScore = ScoringSystem.getScore(place);
-            if(nearbyPlaceHighestScore == null || (highestScore < tempScore)) {
-                nearbyPlaceHighestScore = place;
+            double tempDistance = getDistance(place, this.lastLocation);
+            tempDistance = gpsPointsToMetes(tempDistance);
+            if(mostPopulatedPlace == null || (highestScore < tempScore)) {
+                mostPopulatedPlace = place;
                 highestScore = tempScore;
+            }
+            if(nearestPlace == null || nearestPlaceDistance < tempDistance) {
+                nearestPlace = place;
+                nearestPlaceDistance = gpsPointsToMetes(getDistance(nearestPlace, this.lastLocation));
             }
             totalScore += tempScore;
         }
-        double distance = getDistance(nearbyPlaceHighestScore, this.lastLocation);
+        double distance = getDistance(mostPopulatedPlace, this.lastLocation);
         distance = gpsPointsToMetes(distance);
+        Log.i("Warning Nearest", ""+nearestPlaceDistance+"m "+nearestPlace.getName());
         Log.i("Warning Total Places", ""+places.size());
         Log.i("Warning Total Score", ""+totalScore);
-        Log.i("Warning Highest", nearbyPlaceHighestScore.getName()+" : "+highestScore);
-        Log.i("Warning Highest Dist", nearbyPlaceHighestScore.getName()+" : "+distance);
-        warningSystem.getSlowUpComing(nearbyPlaceHighestScore.getName(), ScoringSystem.getHighscorePlaceType(nearbyPlaceHighestScore), distance);
+        Log.i("Warning Highest", mostPopulatedPlace.getName()+" : "+highestScore);
+        Log.i("Warning Highest Dist", mostPopulatedPlace.getName()+" : "+distance);
+        double speed =  130; // TODO: Remove me. => this.lastSpeed;
+        if(shouldSlowDownUpcomingPlace(nearestPlaceDistance, speed)) {
+            warningSystem.getSlowUpComing(nearestPlace.getName(), ScoringSystem.getHighscorePlaceType(nearestPlace), distance);
+        }
+    }
+
+    private boolean shouldSlowDownUpcomingPlace(double distance, double speed) {
+        // Source: https://www.qld.gov.au/transport/safety/road-safety/driving-safely/stopping-distances/graph
+        double excess = 0;
+        double totalStopping = 0;
+        if(speed >= 110) {
+            totalStopping = 143;
+            excess = speed - 110;
+        }
+        else if(speed >= 100) {
+            totalStopping = 122;
+            excess = speed - 100;
+        }
+        else if(speed >= 90) {
+            totalStopping = 103;
+            excess = speed - 90;
+        }
+        else if(speed >= 80) {
+            totalStopping = 85;
+            excess = speed - 80;
+        }
+        else if(speed >= 70) {
+            totalStopping = 69;
+            excess = speed - 70;
+        }
+        else if(speed >= 60) {
+            totalStopping = 54;
+            excess = speed - 60;
+        }
+        else if(speed >= 50) {
+            totalStopping = 41;
+            excess = speed - 50;
+        }
+        else if(speed >= 40) {
+            totalStopping = 30;
+            excess = speed - 40;
+        }
+        totalStopping += excess;
+
+        return distance <= totalStopping;
     }
 
     private String joinStringArray(String[] array, String joiner) {

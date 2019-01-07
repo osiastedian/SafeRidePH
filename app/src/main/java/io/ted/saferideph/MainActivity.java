@@ -192,7 +192,6 @@ public class MainActivity extends AppCompatActivity implements
 //        byte[] data = warningSystem.textToSpeech("Hello World!");
 //        MediaPlayer.
         warningSystem.getSlowUpComing("restaurant", 100);
-
     }
 
     public void playSchoolZoneAhead() {
