@@ -175,7 +175,7 @@ public class MainActivity extends AppCompatActivity implements
 
         this.compass = new Compass(this);
         this.warningSystem = new WarningSystem(this);
-        this.safeRide = new SafeRide(this, mapView, compass, warningSystem);
+        this.safeRide = new SafeRide(this, mapView, compass, warningSystem, firebaseDatabase);
         this.safeRide.onCreate();
     }
 
@@ -327,6 +327,15 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onStopTrackingTouch(SeekBar seekBar) {
 
+    }
+
+    public void onClick_StartButton(View view) {
+        safeRide.startRecording();
+
+    }
+
+    public void onClick_StopButton(View view) {
+        safeRide.stopRecording();
     }
 
 }

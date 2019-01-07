@@ -34,14 +34,19 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.PolygonOptions;
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
-import java.util.UUID;
+
+import io.ted.saferideph.models.Trip;
 
 public class SafeRide implements
         OnMapReadyCallback,
@@ -56,7 +61,7 @@ public class SafeRide implements
     private static final String MAP_VIEW_BUNDLE_KEY = "MapViewBundleKey";
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 10001;
     private final double SCAN_RADIUS_IN_METERS = 200;
-    private final float ARC_LENGTH = 20;
+    private final float ARC_LENGTH = 40;
     private final double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.75;
 
     private Context context;
@@ -93,6 +98,10 @@ public class SafeRide implements
     private ArrayList<Marker> nearbyScannedMarkers = new ArrayList<>();
     private ArrayList<NearbyPlace> nearbyPlacesCollection = new ArrayList<>();
 
+    private boolean isRecording = false;
+    private Trip currentTrip;
+    FirebaseDatabase firebaseDatabase;
+
 
     public interface  SafeRideListener {
         void onSpeedChanged(double speed);
@@ -103,7 +112,7 @@ public class SafeRide implements
         void onDistanceTraveled(double distance);
     }
 
-    public SafeRide(final Activity activity, MapView mapView, Compass compass, WarningSystem warningSystem) {
+    public SafeRide(final Activity activity, MapView mapView, Compass compass, WarningSystem warningSystem, FirebaseDatabase firebaseDatabase) {
         this.ownerActivity = activity;
         this.context = activity;
         this.mapView = mapView;
@@ -123,7 +132,7 @@ public class SafeRide implements
             }
         });
         this.locations = new ArrayList<>();
-
+        this.firebaseDatabase = firebaseDatabase;
     }
 
     // Public Methods
@@ -136,6 +145,29 @@ public class SafeRide implements
     public void setListener(SafeRideListener listener) {
         this.mListener = listener;
     }
+
+    public void startRecording() {
+
+        locations.clear();
+        this.isRecording = true;
+        this.currentTrip = new Trip();
+        this.currentTrip.id = Calendar.getInstance().getTime().toString();
+
+    }
+
+    public void stopRecording() {
+        FirebaseDatabase database = firebaseDatabase.getInstance();
+        this.isRecording = false;
+        this.currentTrip.locations = locations;
+        DatabaseReference tripDBRef = database.getReference().child("trips").child(this.currentTrip.id);
+        tripDBRef.setValue(this.currentTrip).addOnSuccessListener(new OnSuccessListener<Void>() {
+            @Override
+            public void onSuccess(Void aVoid) {
+                Log.i("Trip", "Update Success");
+            }
+        });
+    }
+
 
     public void setZoomPreference(final float zoomPreference) {
         this.zoomPreference = zoomPreference;
@@ -168,7 +200,7 @@ public class SafeRide implements
         String baseUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?";
         String url = baseUrl +
                 "location="+lastLocation.getLatitude()+","+ lastLocation.getLongitude()+
-                "&radius=300" +
+                "&radius=" + SCAN_RADIUS_IN_METERS +
 //                "&type=store" +
                 "&key=" + key;
         if(pageToken != null) {
@@ -181,7 +213,7 @@ public class SafeRide implements
                 try {
                     String nextPageToken = response.getString("next_page_token");
                     JSONArray results = response.getJSONArray("results");
-                    ArrayList<SafeRide.NearbyPlace> places = new ArrayList<>();
+                    ArrayList<NearbyPlace> places = new ArrayList<>();
                     for(int i = 0; i < results.length() ; i++) {
                         JSONObject result = results.getJSONObject(i);
                         JSONObject geometry = result.getJSONObject("geometry");
@@ -194,7 +226,7 @@ public class SafeRide implements
                         for(int typesIndex = 0; typesIndex < typesJson.length(); typesIndex++) {
                             types.add(typesJson.getString(typesIndex));
                         }
-                        SafeRide.NearbyPlace place = createNearbyPlace(latitude, longitude, name);
+                        NearbyPlace place = new NearbyPlace(latitude, longitude, name);
                         place.setTypes(types.toArray(new String[types.size()]));
                         places.add(place);
                     }
@@ -433,13 +465,12 @@ public class SafeRide implements
         }
         // Filter Nearby places within radius
 
-        List<NearbyPlace> filteredNearbyPlaces = nearbyPlacesCollection;
-
+        ArrayList<NearbyPlace> scannedPlaces = new ArrayList<>();
         for (NearbyPlace pos :
-                filteredNearbyPlaces) {
+                nearbyPlacesCollection) {
             if(this.lastScanArea != null && isPointOnScanArea(pos.createLatLng(), this.lastScanArea)) {
-                processScannedPlaces(pos);
-                Marker marker = mMap.addMarker(new MarkerOptions().position(pos.createLatLng()).title(pos.name+"_"+joinStringArray(pos.getTypes(),",")));
+                scannedPlaces.add(pos);
+                Marker marker = mMap.addMarker(new MarkerOptions().position(pos.createLatLng()).title(pos.getName()+"_"+joinStringArray(pos.getTypes(),",")));
                 nearbyScannedMarkers.add(marker);
             } else {
                 CircleOptions options = new CircleOptions().center(pos.createLatLng()).radius(5).strokeColor(Color.BLACK).fillColor(Color.BLACK);
@@ -447,12 +478,31 @@ public class SafeRide implements
                 nearbyPlacesCircles.add(marker);
             }
         }
+
+        if(scannedPlaces.size() > 0) {
+            processScannedPlaces(scannedPlaces);
+        }
     }
 
-    private void processScannedPlaces(NearbyPlace place) {
-        double distance = getDistance(place, this.lastLocation);
+    private void processScannedPlaces(ArrayList<NearbyPlace> places) {
+        NearbyPlace nearbyPlaceHighestScore = null;
+        long highestScore = 0;
+        long totalScore = 0;
+        for (NearbyPlace place : places) {
+            long tempScore = ScoringSystem.getScore(place);
+            if(nearbyPlaceHighestScore == null || (highestScore < tempScore)) {
+                nearbyPlaceHighestScore = place;
+                highestScore = tempScore;
+            }
+            totalScore += tempScore;
+        }
+        double distance = getDistance(nearbyPlaceHighestScore, this.lastLocation);
         distance = gpsPointsToMetes(distance);
-        warningSystem.getSlowUpComing(place.name, distance);
+        Log.i("Warning Total Places", ""+places.size());
+        Log.i("Warning Total Score", ""+totalScore);
+        Log.i("Warning Highest", nearbyPlaceHighestScore.getName()+" : "+highestScore);
+        Log.i("Warning Highest Dist", nearbyPlaceHighestScore.getName()+" : "+distance);
+        warningSystem.getSlowUpComing(nearbyPlaceHighestScore.getName(), ScoringSystem.getHighscorePlaceType(nearbyPlaceHighestScore), distance);
     }
 
     private String joinStringArray(String[] array, String joiner) {
@@ -465,12 +515,6 @@ public class SafeRide implements
         }
         return  retString;
     }
-
-    public NearbyPlace createNearbyPlace(double latitude, double longitude, String name) {
-        return new NearbyPlace(latitude, longitude, name);
-    }
-
-
 
     public void clearNearbyMarkers() {
         for (Circle place :
@@ -495,85 +539,6 @@ public class SafeRide implements
             }
         }
         return result;
-    }
-
-
-    public class NearbyPlace  {
-        private String id;
-        private double latitude;
-        private double longitude;
-        private String name;
-        private String[] types;
-
-        private NearbyPlace() {
-            this.id = UUID.randomUUID().toString();
-        }
-
-        private NearbyPlace(double latitude, double longitude) {
-            this.latitude = latitude;
-            this.longitude = longitude;
-            this.id = UUID.randomUUID().toString();
-        }
-
-        private NearbyPlace(double latitude, double longitude, String name) {
-            this.latitude = latitude;
-            this.longitude = longitude;
-            this.name = name;
-            this.id = UUID.randomUUID().toString();
-        }
-
-        public String getId() {
-            return id;
-        }
-
-        public void setId(String id) {
-            this.id = id;
-        }
-
-        public double getLatitude() {
-            return latitude;
-        }
-
-        public void setLatitude(double latitude) {
-            this.latitude = latitude;
-        }
-
-        public double getLongitude() {
-            return longitude;
-        }
-
-        public void setLongitude(double longitude) {
-            this.longitude = longitude;
-        }
-
-        public String getName() {
-            return name;
-        }
-
-        public void setName(String name) {
-            this.name = name;
-        }
-
-        public String[] getTypes() {
-            return types;
-        }
-
-        public void setTypes(String[] types) {
-            this.types = types;
-        }
-
-        public LatLng createLatLng() {
-            return new LatLng(latitude, longitude);
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if(!(obj instanceof NearbyPlace)) {
-                return  false;
-            }
-            NearbyPlace param = (NearbyPlace)obj;
-            return (param.id == this.id) || (param.latitude == latitude && param.longitude == longitude);
-        }
     }
 
 
