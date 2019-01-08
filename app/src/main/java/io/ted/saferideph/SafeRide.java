@@ -60,9 +60,9 @@ public class SafeRide implements
 
     private static final String MAP_VIEW_BUNDLE_KEY = "MapViewBundleKey";
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 10001;
-    private final double SCAN_RADIUS_IN_METERS = 200;
-    private final float ARC_LENGTH = 40;
-    private final double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.75;
+    private final double SCAN_RADIUS_IN_METERS = 400;
+    private final float ARC_LENGTH = 20;
+    private final double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.5;
 
     private Context context;
     private Activity ownerActivity;
@@ -106,7 +106,7 @@ public class SafeRide implements
 
     public interface  SafeRideListener {
         void onSpeedChanged(double speed);
-        void onlatitudeChanged(double latitude);
+        void onLatitudeChanged(double latitude);
         void onLongitudeChanged(double longitude);
         void onGPSCountChanged(long gpsCount);
         void onNetworkCountChanged(long networkCount);
@@ -188,6 +188,7 @@ public class SafeRide implements
     public void getCurrentPlaces() {
         currentPagesLoaded = 0;
         this.clearNearbyMarkers();
+        this.nearbyPlacesCollection.clear();
         this.getCurrentPlaces(null);
     }
 
@@ -212,7 +213,10 @@ public class SafeRide implements
             public void onResponse(JSONObject response) {
                 String responseStr = response.toString();
                 try {
-                    String nextPageToken = response.getString("next_page_token");
+                    String nextPageToken = null;
+                    if(response.has("next_page_token")) {
+                        nextPageToken = response.getString("next_page_token");
+                    }
                     JSONArray results = response.getJSONArray("results");
                     ArrayList<NearbyPlace> places = new ArrayList<>();
                     for(int i = 0; i < results.length() ; i++) {
@@ -324,6 +328,8 @@ public class SafeRide implements
     private void updateDistanceTraveled(Location newLocation) {
         double distance = gpsPointsToMetes(getDistance(this.lastLocation, newLocation));
         this.distanceTraveled +=  distance;
+        mListener.onDistanceTraveled(this.distanceTraveled);
+
         this.distanceCounterForFetch += distance;
         if(this.distanceCounterForFetch > DISTANCE_COUNTER_FETCH_CAP) {
             this.distanceCounterForFetch = 0;
@@ -408,18 +414,21 @@ public class SafeRide implements
     @Override
     public void onLocationChanged(Location location) {
         lastSpeed = location.getSpeed() * 3.6; // km/h
+        this.mListener.onSpeedChanged(lastSpeed);
         if(this.lastLocation != null && lastSpeed != 0) {
             this.updateDistanceTraveled(location);
         }
         this.lastLocation = location;
+
         String provider = location.getProvider();
         if(provider.equals(LocationManager.GPS_PROVIDER)) {
-            gpsUpdatesCount++;
+            mListener.onGPSCountChanged(gpsUpdatesCount++);
         } else if(provider.equals(LocationManager.NETWORK_PROVIDER)) {
-            networkUpdatesCount++;
+            mListener.onNetworkCountChanged(networkUpdatesCount++);
         }
         LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
-
+        mListener.onLatitudeChanged(location.getLatitude());
+        mListener.onLongitudeChanged(location.getLongitude());
         if(this.myLocationMarker != null) {
             this.myLocationMarker.remove();
         }
@@ -432,9 +441,9 @@ public class SafeRide implements
         } else {
             mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(this.lastAngle).tilt(45).target(latlng).build()));
         }
-        if(location.getSpeed() != 0) { locations.add(location); }
+        if(location.getSpeed() != 0 && isRecording) { locations.add(location); }
         if(mListener != null) {
-            mListener.onlatitudeChanged(location.getLatitude());
+            mListener.onLatitudeChanged(location.getLatitude());
             mListener.onLongitudeChanged(location.getLongitude());
             mListener.onSpeedChanged(location.getSpeed());
             mListener.onGPSCountChanged(this.gpsUpdatesCount);
@@ -514,7 +523,7 @@ public class SafeRide implements
         Log.i("Warning Total Score", ""+totalScore);
         Log.i("Warning Highest", mostPopulatedPlace.getName()+" : "+highestScore);
         Log.i("Warning Highest Dist", mostPopulatedPlace.getName()+" : "+distance);
-        double speed =  130; // TODO: Remove me. => this.lastSpeed;
+        double speed = this.lastSpeed;
         if(shouldSlowDownUpcomingPlace(nearestPlaceDistance, speed)) {
             warningSystem.getSlowUpComing(nearestPlace.getName(), ScoringSystem.getHighscorePlaceType(nearestPlace), distance);
         }
@@ -577,11 +586,13 @@ public class SafeRide implements
                 nearbyPlacesCircles) {
             place.remove();
         }
+        nearbyPlacesCircles.clear();
 
         for (Marker place :
                 nearbyScannedMarkers) {
             place.remove();
         }
+        nearbyScannedMarkers.clear();
     }
 
     private boolean isPointOnScanArea(LatLng loc, List<LatLng> scanArea) {

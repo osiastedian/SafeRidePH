@@ -1,7 +1,6 @@
 package io.ted.saferideph;
 
 import android.annotation.SuppressLint;
-import android.media.MediaPlayer;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
@@ -14,14 +13,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.android.volley.Request;
-import com.android.volley.RequestQueue;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
-import com.android.volley.toolbox.JsonObjectRequest;
-import com.android.volley.toolbox.Volley;
 import com.google.android.gms.location.places.GeoDataClient;
 import com.google.android.gms.location.places.PlaceDetectionClient;
 import com.google.android.gms.location.places.Places;
@@ -33,15 +25,12 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
-import java.util.ArrayList;
+import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity implements
         ActivityCompat.OnRequestPermissionsResultCallback,
-        SeekBar.OnSeekBarChangeListener
+        SeekBar.OnSeekBarChangeListener,
+        SafeRide.SafeRideListener
 {
     private static final boolean AUTO_HIDE = true;
     private static final int AUTO_HIDE_DELAY_MILLIS = 3000;
@@ -177,6 +166,7 @@ public class MainActivity extends AppCompatActivity implements
         this.warningSystem = new WarningSystem(this);
         this.safeRide = new SafeRide(this, mapView, compass, warningSystem, firebaseDatabase);
         this.safeRide.onCreate();
+        this.safeRide.setListener(this);
     }
 
     public void onTest(View view) {
@@ -337,5 +327,64 @@ public class MainActivity extends AppCompatActivity implements
         safeRide.stopRecording();
     }
 
+    @Override
+    public void onSpeedChanged(final double speed) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                speedTextView.setText(String.format(Locale.ENGLISH, "%.0fkm/h", speed));
+            }
+        });
+    }
+
+    @Override
+    public void onLatitudeChanged(final double latitude) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                latText.setText(String.format(Locale.ENGLISH, "Latitude: %f", latitude));
+            }
+        });
+    }
+
+    @Override
+    public void onLongitudeChanged(final double longitude) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                longText.setText(String.format(Locale.ENGLISH, "Longitude: %f", longitude));
+            }
+        });
+    }
+
+    @Override
+    public void onGPSCountChanged(final long gpsCount) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                gpsUpdateTextView.setText(String.format(Locale.ENGLISH, "GPS: %d", gpsCount));
+            }
+        });
+    }
+
+    @Override
+    public void onNetworkCountChanged(final long networkCount) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                networkUpdateTextView.setText(String.format(Locale.ENGLISH, "Network: %d", networkCount));
+            }
+        });
+    }
+
+    @Override
+    public void onDistanceTraveled(final double distance) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                traveledTextView.setText(String.format(Locale.ENGLISH, "Traveled: %.2f", distance));
+            }
+        });
+    }
 }
 
