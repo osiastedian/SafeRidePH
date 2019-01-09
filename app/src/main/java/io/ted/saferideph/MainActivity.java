@@ -1,6 +1,7 @@
 package io.ted.saferideph;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
@@ -13,6 +14,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.location.places.GeoDataClient;
 import com.google.android.gms.location.places.PlaceDetectionClient;
@@ -106,8 +108,14 @@ public class MainActivity extends AppCompatActivity implements
     Compass compass;
     SafeRide safeRide;
     WarningSystem warningSystem;
+    BumpDetectionSystem bumpDetectionSystem;
 
     private SeekBar zoomSeekBar;
+
+    private SeekBar xSeekbar;
+    private SeekBar ySeekbar;
+    private SeekBar zSeekbar;
+
 
 
 
@@ -164,7 +172,8 @@ public class MainActivity extends AppCompatActivity implements
 
         this.compass = new Compass(this);
         this.warningSystem = new WarningSystem(this);
-        this.safeRide = new SafeRide(this, mapView, compass, warningSystem, firebaseDatabase);
+        this.bumpDetectionSystem = new BumpDetectionSystem(this);
+        this.safeRide = new SafeRide(this, mapView, compass, warningSystem, firebaseDatabase, bumpDetectionSystem);
         this.safeRide.onCreate();
         this.safeRide.setListener(this);
     }
@@ -246,6 +255,7 @@ public class MainActivity extends AppCompatActivity implements
         super.onResume();
         mapView.onResume();
         compass.start();
+        bumpDetectionSystem.start();
     }
 
     @Override
@@ -253,6 +263,7 @@ public class MainActivity extends AppCompatActivity implements
         super.onStart();
         mapView.onStart();
         compass.start();
+        bumpDetectionSystem.start();
     }
 
     @Override
@@ -260,12 +271,14 @@ public class MainActivity extends AppCompatActivity implements
         super.onStop();
         mapView.onStop();
         compass.stop();
+        bumpDetectionSystem.stop();
     }
 
     @Override
     protected void onPause() {
         mapView.onPause();
         compass.stop();
+        bumpDetectionSystem.stop();
         super.onPause();
     }
 
@@ -273,6 +286,7 @@ public class MainActivity extends AppCompatActivity implements
     protected void onDestroy() {
         mapView.onDestroy();
         compass.stop();
+        bumpDetectionSystem.stop();
         super.onDestroy();
     }
 
@@ -305,7 +319,12 @@ public class MainActivity extends AppCompatActivity implements
 
     @Override
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-        this.safeRide.setZoomPreference(10 + progress);
+        switch (seekBar.getId()) {
+            case R.id.zoomSeekBar: {
+                this.safeRide.setZoomPreference(10 + progress);
+                break;
+            }
+        }
     }
 
     @Override

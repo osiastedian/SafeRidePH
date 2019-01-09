@@ -44,7 +44,9 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 
 import io.ted.saferideph.models.Trip;
 
@@ -55,12 +57,13 @@ public class SafeRide implements
         GoogleMap.OnMyLocationClickListener,
         ActivityCompat.OnRequestPermissionsResultCallback,
         LocationSource.OnLocationChangedListener,
-        LocationListener
+        LocationListener,
+        BumpDetectionSystem.BumpListener
 {
 
     private static final String MAP_VIEW_BUNDLE_KEY = "MapViewBundleKey";
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 10001;
-    private final double SCAN_RADIUS_IN_METERS = 400;
+    private final double SCAN_RADIUS_IN_METERS = 200;
     private final float ARC_LENGTH = 20;
     private final double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.5;
 
@@ -94,6 +97,7 @@ public class SafeRide implements
     private SafeRideListener mListener;
     private Compass compass;
     private WarningSystem warningSystem;
+    private BumpDetectionSystem bumpDetectionSystem;
 
     private ArrayList<Circle> nearbyPlacesCircles = new ArrayList<>();
     private ArrayList<Marker> nearbyScannedMarkers = new ArrayList<>();
@@ -113,12 +117,13 @@ public class SafeRide implements
         void onDistanceTraveled(double distance);
     }
 
-    public SafeRide(final Activity activity, MapView mapView, Compass compass, WarningSystem warningSystem, FirebaseDatabase firebaseDatabase) {
+    public SafeRide(final Activity activity, MapView mapView, Compass compass, WarningSystem warningSystem, FirebaseDatabase firebaseDatabase, BumpDetectionSystem bumpDetectionSystem) {
         this.ownerActivity = activity;
         this.context = activity;
         this.mapView = mapView;
         this.compass = compass;
         this.warningSystem = warningSystem;
+        this.bumpDetectionSystem = bumpDetectionSystem;
         this.compass.setListener(new Compass.CompassListener() {
             @Override
             public void onNewAzimuth(final float azimuth) {
@@ -132,6 +137,7 @@ public class SafeRide implements
                 );
             }
         });
+        this.bumpDetectionSystem.setListener(this);
         this.locations = new ArrayList<>();
         this.firebaseDatabase = firebaseDatabase;
     }
@@ -197,14 +203,17 @@ public class SafeRide implements
             return;
         }
         RequestQueue queue = Volley.newRequestQueue(ownerActivity);
-
+        LatLng ahead = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
+        ahead = translate(ahead, this.lastAngle, SCAN_RADIUS_IN_METERS);
+        double latitude = ahead.latitude;
+        double longitude = ahead.longitude;
         String key = "AIzaSyASG1Kwhyrz8XTJdJsGfKDJ8XYby-rjNMs";
         String baseUrl = "https://maps.googleapis.com/maps/api/place/nearbysearch/json?";
         String url = baseUrl +
-                "location="+lastLocation.getLatitude()+","+ lastLocation.getLongitude()+
-                "&radius=" + SCAN_RADIUS_IN_METERS +
+                String.format(Locale.ENGLISH, "location=%f,%f", latitude, longitude)+
+                String.format(Locale.ENGLISH, "&radius=%.0f", SCAN_RADIUS_IN_METERS * 1.0) +
 //                "&type=store" +
-                "&key=" + key;
+                String.format(Locale.ENGLISH, "&key=%s", key);
         if(pageToken != null) {
             url = baseUrl + "pagetoken="+ pageToken + "&key=" + key;
         }
@@ -236,10 +245,10 @@ public class SafeRide implements
                         places.add(place);
                     }
                     addNearbyMarkers(places);
-                    if(nextPageToken != null && nextPageToken.length() > 0) {
-                        currentPagesLoaded++;
-                        getCurrentPlaces(nextPageToken);
-                    }
+//                    if(nextPageToken != null && nextPageToken.length() > 0) {
+//                        currentPagesLoaded++;
+//                        getCurrentPlaces(nextPageToken);
+//                    }
 
 
                 } catch (JSONException exception) {
@@ -250,7 +259,7 @@ public class SafeRide implements
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
-                Log.e("Current Places", error.getMessage());
+                Log.e("Current Places", "Message -- "+error.getMessage());
             }
         });
         queue.add(request);
@@ -259,6 +268,14 @@ public class SafeRide implements
 
 
     // Helper Methods
+
+    private LatLng translate(LatLng original, float angle, double distance) {
+        distance /= 1000;
+        distance /= 110.567;
+        double lat = original.latitude  + (distance * Math.cos(Math.PI / 180 * angle));
+        double lng = original.longitude + (distance * Math.sin(Math.PI / 180 * angle));
+        return new LatLng(lat, lng);
+    }
 
 
     private void checkLocationPermission() {
@@ -332,12 +349,12 @@ public class SafeRide implements
 
         this.distanceCounterForFetch += distance;
         if(this.distanceCounterForFetch > DISTANCE_COUNTER_FETCH_CAP) {
-            this.distanceCounterForFetch = 0;
+            this.distanceCounterForFetch -= DISTANCE_COUNTER_FETCH_CAP;
             this.getCurrentPlaces();
         }
         if(mListener != null) { mListener.onDistanceTraveled(this.distanceTraveled); }
     }
-    private float directionUpdateAngleThreshold = 5;
+    private float directionUpdateAngleThreshold = 1;
 //    private float lastRecordAngle = 0.0f;
 
     private void updateDirection(float angle){
@@ -345,23 +362,26 @@ public class SafeRide implements
         float diff = Math.abs(lastAngle - angle);
         // Added
         if( diff > directionUpdateAngleThreshold) {
-            if(this.lastLocation == null) return;
-            currentDirection = angle;
-            lastScanArea = getScanCoordinates(this.lastLocation, currentDirection, SCAN_RADIUS_IN_METERS, ARC_LENGTH);
-            if(this.scanArea != null) {
-                if(Math.floor(this.lastAngle) != angle) {
-                    this.scanArea.setPoints(lastScanArea);
-                }
-            }
-            else {
-                this.scanArea = mMap.addPolygon(getScanAreaOptions(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
-            }
-
-            this.clearNearbyMarkers();
-            this.addNearbyMarkers(null);
             this.lastAngle = angle;
-
+            this.drawScannedArea(angle);
         }
+    }
+
+    private void drawScannedArea(float angle) {
+        if(this.lastLocation == null) return;
+        currentDirection = angle;
+        lastScanArea = getScanCoordinates(this.lastLocation, currentDirection, SCAN_RADIUS_IN_METERS, ARC_LENGTH);
+        if(this.scanArea != null) {
+            if(Math.floor(this.lastAngle) != angle) {
+                this.scanArea.setPoints(lastScanArea);
+            }
+        }
+        else {
+            this.scanArea = mMap.addPolygon(getScanAreaOptions(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
+        }
+
+        this.clearNearbyMarkers();
+        this.addNearbyMarkers(null);
     }
     // Override Methods
 
@@ -415,7 +435,9 @@ public class SafeRide implements
     public void onLocationChanged(Location location) {
         lastSpeed = location.getSpeed() * 3.6; // km/h
         this.mListener.onSpeedChanged(lastSpeed);
-        if(this.lastLocation != null && lastSpeed != 0) {
+        if(this.lastLocation != null
+//                && lastSpeed != 0
+        ) {
             this.updateDistanceTraveled(location);
         }
         this.lastLocation = location;
@@ -442,6 +464,7 @@ public class SafeRide implements
             mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(this.lastAngle).tilt(45).target(latlng).build()));
         }
         if(location.getSpeed() != 0 && isRecording) { locations.add(location); }
+        drawScannedArea(this.lastAngle);
         if(mListener != null) {
             mListener.onLatitudeChanged(location.getLatitude());
             mListener.onLongitudeChanged(location.getLongitude());
@@ -608,5 +631,15 @@ public class SafeRide implements
         return result;
     }
 
-
+    @Override
+    public void onBump(final long timestamp) {
+        ownerActivity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Date date = Calendar.getInstance().getTime();
+                String dateFormatted = date.toString();
+                Toast.makeText(context, String.format(Locale.ENGLISH, "Bump on %f, %f at %s", lastLocation.getLatitude(), lastLocation.getLongitude(), dateFormatted), Toast.LENGTH_LONG).show();
+            }
+        });
+    }
 }
