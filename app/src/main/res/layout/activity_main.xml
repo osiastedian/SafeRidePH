@@ -22,42 +22,15 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
-
         <SeekBar
             android:id="@+id/zoomSeekBar"
             style="@style/Widget.AppCompat.SeekBar.Discrete"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_above="@+id/locationDetailsCard"
+            android:layout_above="@id/locationDetailsCard"
             android:layout_marginBottom="0dp"
             android:max="10"
             android:progress="0" />
-
-        <android.support.v7.widget.CardView
-            android:id="@+id/speedCard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_alignParentTop="true"
-            android:layout_marginLeft="5dp"
-            android:layout_marginTop="0dp"
-            android:layout_marginRight="5dp"
-            android:layout_marginBottom="0dp">
-
-            <TextView
-                android:id="@+id/speedTextView"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:minHeight="100dp"
-                android:text="0 km/h"
-                android:textSize="36sp" />
-
-            <TextView
-                android:id="@+id/traveledTextView"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Traveled: 0.0m" />
-        </android.support.v7.widget.CardView>
 
         <android.support.v7.widget.CardView
             android:id="@+id/locationDetailsCard"
@@ -68,47 +41,112 @@
             android:layout_marginTop="-95dp"
             app:cardBackgroundColor="@color/cardview_dark_background">
 
-            <LinearLayout
-                android:id="@+id/fullscreen_content"
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <LinearLayout
+                    android:id="@+id/fullscreen_content"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="10dp">
+
+                    <TextView
+                        android:id="@+id/traveledTextView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Traveled: 0.0m"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/scannedPlacesCount"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Scanned Places:"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/textViewLat"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Lattitude:"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/textViewLong"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Longitude:"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/gpsUpdateTextView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="GPS:"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/netowkrUpdateTextView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Network:"
+                        android:textColor="@android:color/white" />
+
+                </LinearLayout>
+
+                <Button
+                    android:id="@+id/settingsButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentRight="true"
+                    android:layout_alignParentTop="true"
+                    android:onClick="onClick_SettingsButton"
+                    android:text="Settings" />
+
+            </RelativeLayout>
+        </android.support.v7.widget.CardView>
+
+        <android.support.v7.widget.CardView
+            android:id="@+id/speedCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:layout_marginBottom="0dp"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp"
+            android:layout_marginTop="0dp">
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="10dp">
+                android:gravity="center"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+            >
+                <TextView
+                    android:id="@+id/speedTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="100 km/h"
+                    android:textSize="36sp" />
 
                 <TextView
-                    android:id="@+id/textViewLat"
-                    android:layout_width="match_parent"
+                    android:id="@+id/excessSpeedTextView"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Lattitude:"
-                    android:textColor="@android:color/white" />
+                    android:layout_toRightOf="@id/speedTextView"
+                    android:gravity="center"
+                    android:text="(+99)"
+                    android:textColor="@android:color/white"
+                    android:textSize="36sp" />
+            </RelativeLayout>
 
-                <TextView
-                    android:id="@+id/textViewLong"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Longitude:"
-                    android:textColor="@android:color/white" />
-
-                <TextView
-                    android:id="@+id/gpsUpdateTextView"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="GPS:"
-                    android:textColor="@android:color/white" />
-
-                <TextView
-                    android:id="@+id/netowkrUpdateTextView"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Network:"
-                    android:textColor="@android:color/white" />
-
-            </LinearLayout>
         </android.support.v7.widget.CardView>
 
     </RelativeLayout>
 
-    <FrameLayout
+    <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:fitsSystemWindows="true">
@@ -120,6 +158,7 @@
             android:layout_height="wrap_content"
             android:layout_gravity="bottom|center_horizontal"
             android:background="@color/black_overlay"
+            android:layout_alignParentBottom="true"
             android:orientation="horizontal"
             tools:ignore="UselessParent">
 
@@ -150,6 +189,7 @@
                 android:text="TEST" />
 
         </LinearLayout>
-    </FrameLayout>
+
+    </RelativeLayout>
 
 </FrameLayout>

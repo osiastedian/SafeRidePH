@@ -64,7 +64,8 @@ public class BumpDetectionSystem implements SensorEventListener {
 
     public double xThreshold = 0;
     public double yThreshold = 0;
-    public double zThreshold = 4.5;
+    public double zThreshold = 4.7;
+    public static final double MAX_THRESHOLD = 10;
     @Override
     public void onSensorChanged(SensorEvent event) {
         if(event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {

@@ -47,6 +47,12 @@ public class WarningSystem implements TextToSpeech.OnInitListener {
         textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, text);
     }
 
+    public void speedingWarning(double excessSpeed) {
+        if(onGoingWarning) return;
+        String text = String.format(Locale.ENGLISH, "Slow Down! You are over speeding by %.0f %s.", excessSpeed, currentSpeedUnit);
+        textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, text);
+    }
+
     public void speedingWarning(double currentSpeed, double speedLimit) {
         if(onGoingWarning) return;
         String text = String.format(Locale.ENGLISH, "Slow Down! You are over speeding by %.0f %s.", currentSpeed - speedLimit, currentSpeedUnit);

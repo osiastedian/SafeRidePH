@@ -1,25 +1,24 @@
 package io.ted.saferideph;
 
 import android.annotation.SuppressLint;
-import android.content.Context;
+import android.content.Intent;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.CardView;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
-import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.google.android.gms.location.places.GeoDataClient;
 import com.google.android.gms.location.places.PlaceDetectionClient;
 import com.google.android.gms.location.places.Places;
-import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -27,7 +26,12 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import java.util.ArrayList;
 import java.util.Locale;
+
+import static io.ted.saferideph.SettingsActivity.BUNDLE_BUMP_THRESHOLD;
+import static io.ted.saferideph.SettingsActivity.BUNDLE_OVER_SPEED_TOLERATE;
+import static io.ted.saferideph.SettingsActivity.BUNDLE_SCAN_RADIUS;
 
 public class MainActivity extends AppCompatActivity implements
         ActivityCompat.OnRequestPermissionsResultCallback,
@@ -37,7 +41,7 @@ public class MainActivity extends AppCompatActivity implements
     private static final boolean AUTO_HIDE = true;
     private static final int AUTO_HIDE_DELAY_MILLIS = 3000;
 
-    private static final int UI_ANIMATION_DELAY = 300;
+    private static final int UI_ANIMATION_DELAY = 100;
     private final Handler mHideHandler = new Handler();
     private View mContentView;
     private final Runnable mHidePart2Runnable = new Runnable() {
@@ -82,21 +86,17 @@ public class MainActivity extends AppCompatActivity implements
     };
 
     private static final String MAP_VIEW_BUNDLE_KEY = "MapViewBundleKey";
-    private static final int MY_PERMISSIONS_REQUEST_LOCATION = 10001;
-    private final double SCAN_RADIUS_IN_METERS = 200;
-    private final float ARC_LENGTH = 20;
-    private final double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.75;
 
     private MapView mapView;
     private TextView latText;
     private TextView longText;
-    private GoogleMap mMap;
     private TextView gpsUpdateTextView;
     private TextView speedTextView;
     private TextView networkUpdateTextView;
     private TextView traveledTextView;
-    private Button startButton;
-    private Button stopButton;
+    private TextView scannedPlacesTextView;
+    private CardView speedCard;
+    private TextView excessSpeedTextView;
 
     private FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
     private DatabaseReference databaseReference = firebaseDatabase.getReference("trips");
@@ -158,11 +158,12 @@ public class MainActivity extends AppCompatActivity implements
         gpsUpdateTextView = findViewById(R.id.gpsUpdateTextView);
         speedTextView = findViewById(R.id.speedTextView);
         networkUpdateTextView = findViewById(R.id.netowkrUpdateTextView);
-        startButton = findViewById(R.id.startButton);
-        stopButton = findViewById(R.id.stopButton);
         traveledTextView = findViewById(R.id.traveledTextView);
+        scannedPlacesTextView = findViewById(R.id.scannedPlacesCount);
         zoomSeekBar = findViewById(R.id.zoomSeekBar);
         zoomSeekBar.setOnSeekBarChangeListener(this);
+        speedCard = findViewById(R.id.speedCard);
+        excessSpeedTextView = findViewById(R.id.excessSpeedTextView);
 
         this.loadTripsValueListener();
 
@@ -177,26 +178,6 @@ public class MainActivity extends AppCompatActivity implements
         this.safeRide.onCreate();
         this.safeRide.setListener(this);
     }
-
-    public void onTest(View view) {
-//        warningSystem.newSpeedLimit(40);
-        warningSystem.speedingWarning(40, 35);
-//        this.playWarningSound();
-    }
-
-
-
-    public void playWarningSound() {
-        if(warningSystem != null)
-//        byte[] data = warningSystem.textToSpeech("Hello World!");
-//        MediaPlayer.
-        warningSystem.getSlowUpComing("restaurant", 100);
-    }
-
-    public void playSchoolZoneAhead() {
-
-    }
-
 
     private void loadTripsValueListener() {
         databaseReference.addValueEventListener(new ValueEventListener() {
@@ -346,6 +327,45 @@ public class MainActivity extends AppCompatActivity implements
         safeRide.stopRecording();
     }
 
+    final int SETTINGS_REQUEST_CODE = 0xFF00;
+
+    public void onClick_SettingsButton(View view) {
+        Intent intent = new Intent(this, SettingsActivity.class);
+        intent.putExtra(BUNDLE_BUMP_THRESHOLD, bumpDetectionSystem.zThreshold);
+        intent.putExtra(BUNDLE_SCAN_RADIUS,(int) safeRide.getScanRadius());
+        startActivityForResult(intent, SETTINGS_REQUEST_CODE);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        switch (requestCode) {
+            case SETTINGS_REQUEST_CODE: {
+                Bundle bundle = data.getExtras();
+                if(bundle != null) {
+                    double threshold = bundle.getDouble(BUNDLE_BUMP_THRESHOLD, -1);
+                    if(threshold != -1) {
+                        this.bumpDetectionSystem.zThreshold = threshold;
+                    }
+
+                    // RADIUS
+
+                    int radius = bundle.getInt(BUNDLE_SCAN_RADIUS, -1);
+                    if(threshold != -1) {
+                        safeRide.setScanRadius(radius);
+                    }
+
+                    // OVER SPEED TOLERATE
+
+                    int tolerate = bundle.getInt(BUNDLE_OVER_SPEED_TOLERATE, -1);
+                    if(tolerate >=0 ) {
+                        safeRide.setOverSpeedTolerate(tolerate);
+                    }
+                }
+            }
+        }
+        super.onActivityResult(requestCode, resultCode, data);
+    }
+
     @Override
     public void onSpeedChanged(final double speed) {
         this.runOnUiThread(new Runnable() {
@@ -402,6 +422,45 @@ public class MainActivity extends AppCompatActivity implements
             @Override
             public void run() {
                 traveledTextView.setText(String.format(Locale.ENGLISH, "Traveled: %.2f", distance));
+            }
+        });
+    }
+
+    @Override
+    public void onScannedPlaces(final ArrayList<NearbyPlace> scannedPlaces) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                scannedPlacesTextView.setText(String.format(Locale.ENGLISH, "Scanned Places: %d", scannedPlaces.size()));
+            }
+        });
+    }
+
+    @Override
+    public void onOverSpeedingUpdate(final double excessSpeed) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if(excessSpeed > safeRide.getOverSpeedTolerate()) {
+                    double maxExcess = 10;
+                    double colorPercent = excessSpeed/maxExcess;
+                    double color = 255 - (255 * colorPercent);
+                    color = color < 0 ? 0: color;
+                    speedCard.setBackgroundColor(Color.argb(255, 255, (int) color, (int)color));
+                    if(colorPercent < .3) {
+                        speedTextView.setTextColor(Color.BLACK);
+                        excessSpeedTextView.setTextColor(Color.BLACK);
+                    } else {
+                        speedTextView.setTextColor(Color.WHITE);
+                        excessSpeedTextView.setTextColor(Color.WHITE);
+                    }
+                    excessSpeedTextView.setText(String.format(Locale.ENGLISH,"(+%.0f)", excessSpeed));
+                    warningSystem.speedingWarning(excessSpeed);
+                } else {
+                    speedCard.setBackgroundColor(Color.WHITE);
+                    speedTextView.setTextColor(Color.BLACK);
+                    excessSpeedTextView.setText("");
+                }
             }
         });
     }

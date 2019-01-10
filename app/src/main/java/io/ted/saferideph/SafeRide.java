@@ -61,11 +61,13 @@ public class SafeRide implements
         BumpDetectionSystem.BumpListener
 {
 
-    private static final String MAP_VIEW_BUNDLE_KEY = "MapViewBundleKey";
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 10001;
-    private final double SCAN_RADIUS_IN_METERS = 200;
+    public static final int MAX_RADIUS = 1000;
+    public static final int MIN_RADIUS = 100;
+    private double SCAN_RADIUS_IN_METERS = 200;
+    private double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.5;
     private final float ARC_LENGTH = 20;
-    private final double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.5;
+
 
     private Context context;
     private Activity ownerActivity;
@@ -79,7 +81,9 @@ public class SafeRide implements
     public Location lastLocation;
     private float lastAngle = 0.0f;
     private List<LatLng> lastScanArea;
-    private double lastSpeed;  // km/h
+    private double lastSpeed;  // kmph
+    private double lastSpeedLimit = 2; //kmph
+    private int overSpeedTolerate = 0; //kmph
 
     private float currentDirection = 0.0f;
     private long gpsUpdatesCount = 0;
@@ -115,6 +119,8 @@ public class SafeRide implements
         void onGPSCountChanged(long gpsCount);
         void onNetworkCountChanged(long networkCount);
         void onDistanceTraveled(double distance);
+        void onScannedPlaces(ArrayList<NearbyPlace> scannedPlaces);
+        void onOverSpeedingUpdate(double excessSpeed);
     }
 
     public SafeRide(final Activity activity, MapView mapView, Compass compass, WarningSystem warningSystem, FirebaseDatabase firebaseDatabase, BumpDetectionSystem bumpDetectionSystem) {
@@ -173,6 +179,13 @@ public class SafeRide implements
                 Log.i("Trip", "Update Success");
             }
         });
+    }
+
+    public double getScanRadius() { return SCAN_RADIUS_IN_METERS; }
+
+    public void setScanRadius(double radius){
+        SCAN_RADIUS_IN_METERS = radius;
+        DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.5;
     }
 
 
@@ -266,6 +279,13 @@ public class SafeRide implements
         Toast.makeText(ownerActivity, "Get Current Places", Toast.LENGTH_SHORT).show();
     }
 
+    public int getOverSpeedTolerate() {
+        return overSpeedTolerate;
+    }
+
+    public void setOverSpeedTolerate(int overSpeedTolerate) {
+        this.overSpeedTolerate = overSpeedTolerate;
+    }
 
     // Helper Methods
 
@@ -433,21 +453,21 @@ public class SafeRide implements
 
     @Override
     public void onLocationChanged(Location location) {
+        String provider = location.getProvider();
+        if(provider.equals(LocationManager.GPS_PROVIDER)) {
+            mListener.onGPSCountChanged(gpsUpdatesCount++);
+        } else if(provider.equals(LocationManager.NETWORK_PROVIDER)) {
+            mListener.onNetworkCountChanged(networkUpdatesCount++);
+            return;
+        }
         lastSpeed = location.getSpeed() * 3.6; // km/h
-        this.mListener.onSpeedChanged(lastSpeed);
+
         if(this.lastLocation != null
 //                && lastSpeed != 0
         ) {
             this.updateDistanceTraveled(location);
         }
         this.lastLocation = location;
-
-        String provider = location.getProvider();
-        if(provider.equals(LocationManager.GPS_PROVIDER)) {
-            mListener.onGPSCountChanged(gpsUpdatesCount++);
-        } else if(provider.equals(LocationManager.NETWORK_PROVIDER)) {
-            mListener.onNetworkCountChanged(networkUpdatesCount++);
-        }
         LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
         mListener.onLatitudeChanged(location.getLatitude());
         mListener.onLongitudeChanged(location.getLongitude());
@@ -468,7 +488,8 @@ public class SafeRide implements
         if(mListener != null) {
             mListener.onLatitudeChanged(location.getLatitude());
             mListener.onLongitudeChanged(location.getLongitude());
-            mListener.onSpeedChanged(location.getSpeed());
+            mListener.onSpeedChanged(lastSpeed);
+            mListener.onOverSpeedingUpdate(lastSpeed - lastSpeedLimit);
             mListener.onGPSCountChanged(this.gpsUpdatesCount);
             mListener.onNetworkCountChanged(this.networkUpdatesCount);
         }
@@ -513,6 +534,7 @@ public class SafeRide implements
             }
         }
 
+        this.mListener.onScannedPlaces(scannedPlaces);
         if(scannedPlaces.size() > 0) {
             processScannedPlaces(scannedPlaces);
         }
@@ -638,8 +660,10 @@ public class SafeRide implements
             public void run() {
                 Date date = Calendar.getInstance().getTime();
                 String dateFormatted = date.toString();
+                if(lastLocation != null)
                 Toast.makeText(context, String.format(Locale.ENGLISH, "Bump on %f, %f at %s", lastLocation.getLatitude(), lastLocation.getLongitude(), dateFormatted), Toast.LENGTH_LONG).show();
             }
         });
     }
+
 }
