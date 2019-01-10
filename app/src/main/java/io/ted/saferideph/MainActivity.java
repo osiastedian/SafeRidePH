@@ -1,12 +1,15 @@
 package io.ted.saferideph;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
 import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.CardView;
@@ -20,6 +23,7 @@ import android.widget.TextView;
 import com.google.android.gms.location.places.GeoDataClient;
 import com.google.android.gms.location.places.PlaceDetectionClient;
 import com.google.android.gms.location.places.Places;
+import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.MapView;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -30,6 +34,8 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
 import java.util.Locale;
 
+import static io.ted.saferideph.SafeRide.MAXIMUM_ZOOM_PREF;
+import static io.ted.saferideph.SafeRide.MINIMUM_ZOOM_PREF;
 import static io.ted.saferideph.SettingsActivity.BUNDLE_BUMP_THRESHOLD;
 import static io.ted.saferideph.SettingsActivity.BUNDLE_BUMP_VOICE_OUT;
 import static io.ted.saferideph.SettingsActivity.BUNDLE_OVER_SPEED_TOLERATE;
@@ -310,7 +316,7 @@ public class MainActivity extends AppCompatActivity implements
     public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
         switch (seekBar.getId()) {
             case R.id.zoomSeekBar: {
-                this.safeRide.setZoomPreference(10 + progress);
+                this.safeRide.setZoomPreference(MINIMUM_ZOOM_PREF + progress);
                 break;
             }
         }
@@ -375,6 +381,13 @@ public class MainActivity extends AppCompatActivity implements
                     if(tolerate >=0 ) {
                         safeRide.setOverSpeedTolerate(tolerate);
                     }
+
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            hide();
+                        }
+                    });
                 }
             }
         }
@@ -488,6 +501,19 @@ public class MainActivity extends AppCompatActivity implements
                 speedLimitTextView.setText(String.format(Locale.ENGLISH, "Limit: %.0fkm/h", speedLimit ));
             }
         });
+    }
+    @Override
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+        switch (requestCode) {
+            case SafeRide.MY_PERMISSIONS_REQUEST_LOCATION: {
+                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
+                            == PackageManager.PERMISSION_GRANTED) {
+                        safeRide.onCreate();
+                    }
+                }
+            } break;
+        }
     }
 }
 

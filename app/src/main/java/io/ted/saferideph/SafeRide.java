@@ -42,12 +42,15 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
+import io.ted.saferideph.models.Bump;
 import io.ted.saferideph.models.Trip;
 
 public class SafeRide implements
@@ -55,7 +58,6 @@ public class SafeRide implements
         GoogleMap.OnMyLocationButtonClickListener,
         GoogleMap.OnCameraMoveListener,
         GoogleMap.OnMyLocationClickListener,
-        ActivityCompat.OnRequestPermissionsResultCallback,
         LocationSource.OnLocationChangedListener,
         LocationListener,
         BumpDetectionSystem.BumpListener,
@@ -63,9 +65,11 @@ public class SafeRide implements
 
 {
 
-    private static final int MY_PERMISSIONS_REQUEST_LOCATION = 10001;
+    public static final int MY_PERMISSIONS_REQUEST_LOCATION = 10001;
     public static final int MAX_RADIUS = 1000;
     public static final int MIN_RADIUS = 100;
+    public static final int MINIMUM_ZOOM_PREF = 15;
+    public static final int MAXIMUM_ZOOM_PREF = 21;
     private double SCAN_RADIUS_IN_METERS = 200;
     private double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.5;
     private final float ARC_LENGTH = 20;
@@ -144,8 +148,10 @@ public class SafeRide implements
     // Public Methods
 
     public void onCreate() {
-        mapView.getMapAsync(this);
-        setUpLocationSource();
+        if(checkLocationPermission()) {
+            mapView.getMapAsync(this);
+            setUpLocationSource();
+        }
     }
 
     public void addListener(SafeRideListener listener) {
@@ -162,6 +168,7 @@ public class SafeRide implements
         this.isRecording = true;
         this.currentTrip = new Trip();
         this.currentTrip.id = Calendar.getInstance().getTime().toString();
+        this.currentTrip.date = Calendar.getInstance().getTime();
 
     }
 
@@ -169,7 +176,12 @@ public class SafeRide implements
         FirebaseDatabase database = firebaseDatabase.getInstance();
         this.isRecording = false;
         this.currentTrip.locations = locations;
-        DatabaseReference tripDBRef = database.getReference().child("trips").child(this.currentTrip.id);
+//        String year = new SimpleDateFormat("yyyy").format(this.currentTrip.date);
+//        String month = new SimpleDateFormat("MM").format(this.currentTrip.date);
+//        String day = new SimpleDateFormat("dd").format(this.currentTrip.date);
+        DatabaseReference tripDBRef = database.getReference().child("trips")
+//                .child(year).child(month).child(day)
+                .child(this.currentTrip.id);
         tripDBRef.setValue(this.currentTrip).addOnSuccessListener(new OnSuccessListener<Void>() {
             @Override
             public void onSuccess(Void aVoid) {
@@ -292,6 +304,11 @@ public class SafeRide implements
         this.voiceOutBumpDetection = voiceOutBumpDetection;
     }
 
+    public float getZoomPreference() {
+        return zoomPreference;
+    }
+
+
     // Helper Methods
 
     private LatLng translate(LatLng original, float angle, double distance) {
@@ -303,11 +320,13 @@ public class SafeRide implements
     }
 
 
-    private void checkLocationPermission() {
+    private boolean checkLocationPermission() {
 
         if (ActivityCompat.checkSelfPermission(this.context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(ownerActivity, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this.ownerActivity, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, MY_PERMISSIONS_REQUEST_LOCATION );
+            return false;
         }
+        return true;
     }
 
     private double getDistance(Location firstLoc, Location secondLoc) {
@@ -329,6 +348,7 @@ public class SafeRide implements
         LocationManager locationManager = (LocationManager) ownerActivity.getSystemService(Context.LOCATION_SERVICE);
         if (ActivityCompat.checkSelfPermission(ownerActivity, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(ownerActivity, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             this.checkLocationPermission();
+            return;
         }
         locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 0, 0,  this);
         locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 0, 0, this);
@@ -363,8 +383,8 @@ public class SafeRide implements
 
         return new PolygonOptions()
                 .addAll(getScanCoordinates(location, angle, radiusInMeters, arcLength))
-                .fillColor(Color.argb(150, 200, 0 ,0 ))
-                .strokeColor(Color.argb(50, 200,0,0))
+                .fillColor(Color.argb(150, 0, 0 ,200 ))
+                .strokeColor(Color.argb(50, 20,0,200))
                 ;
     }
     private void updateDistanceTraveled(Location newLocation) {
@@ -426,12 +446,12 @@ public class SafeRide implements
         mMap = googleMap;
         mMap.setOnMyLocationButtonClickListener(this);
         mMap.setOnMyLocationClickListener(this);
-        mMap.setMinZoomPreference(17);
+        mMap.setMinZoomPreference(MINIMUM_ZOOM_PREF);
         mMap.setOnCameraMoveListener(this);
         if (mMap != null) {
             if (ActivityCompat.checkSelfPermission(ownerActivity, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(ownerActivity, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
                 this.checkLocationPermission();
-                mMap.setMyLocationEnabled(true);
+                return;
             }
             mMap.setMyLocationEnabled(true);
         }
@@ -453,18 +473,6 @@ public class SafeRide implements
 
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        switch (requestCode) {
-            case MY_PERMISSIONS_REQUEST_LOCATION: {
-                if(grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    if (ContextCompat.checkSelfPermission(ownerActivity, Manifest.permission.ACCESS_FINE_LOCATION)
-                            == PackageManager.PERMISSION_GRANTED) {
-                    }
-                }
-            } break;
-        }
-    }
 
     @Override
     public void onLocationChanged(Location location) {
@@ -485,10 +493,10 @@ public class SafeRide implements
         }
         this.lastLocation = location;
         LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
-        if(this.myLocationMarker != null) {
-            this.myLocationMarker.remove();
-        }
-        this.myLocationMarker = mMap.addMarker(new MarkerOptions().title(YOUR_LOCATION).position(latlng));
+//        if(this.myLocationMarker != null) {
+//            this.myLocationMarker.remove();
+//        }
+//        this.myLocationMarker = mMap.addMarker(new MarkerOptions().title(YOUR_LOCATION).position(latlng));
 
         if(!this.firstAnimateFinished){
             mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).target(latlng).zoom(this.zoomPreference).tilt(45).build()));
@@ -681,18 +689,35 @@ public class SafeRide implements
 
     @Override
     public void onBump(final long timestamp) {
+
         ownerActivity.runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                Date date = Calendar.getInstance().getTime();
-                String dateFormatted = date.toString();
-                if(lastLocation != null) {
-                    Toast.makeText(context, String.format(Locale.ENGLISH, "Bump on %f, %f at %s", lastLocation.getLatitude(), lastLocation.getLongitude(), dateFormatted), Toast.LENGTH_LONG).show();
-                    if(voiceOutBumpDetection)
-                        warningSystem.bumpDetected();
-                }
-            }
+          @Override
+          public void run() {
+              if(lastLocation != null) {
+                  FirebaseDatabase database = firebaseDatabase.getInstance();
+                  DatabaseReference bumpDBRef = database.getReference().child("bumps").child(UUID.randomUUID().toString());
+                  Bump bump = new Bump();
+                  bump.latitude = lastLocation.getLatitude();
+                  bump.longitude = lastLocation.getLongitude();
+                  bump.timeStamp =  Calendar.getInstance().getTime();
+                  bumpDBRef.setValue(bump).addOnSuccessListener(
+                          new OnSuccessListener<Void>() {
+                              @Override
+                              public void onSuccess(Void aVoid) {
+                                  Log.i(BumpDetectionSystem.LOG_TAG, "Update Success");
+                              }
+                          });
+                  Toast.makeText(
+                          context,
+                          String.format(Locale.ENGLISH, "Bump on %f, %f at %s", lastLocation.getLatitude(), lastLocation.getLongitude(), Calendar.getInstance().getTime().toString()),
+                          Toast.LENGTH_LONG
+                  ).show();
+                  if(voiceOutBumpDetection)
+                      warningSystem.bumpDetected();
+              }
+          }
         });
+
     }
 
     @Override

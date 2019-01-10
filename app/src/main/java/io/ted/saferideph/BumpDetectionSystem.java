@@ -64,8 +64,8 @@ public class BumpDetectionSystem implements SensorEventListener {
 
     public double xThreshold = 0;
     public double yThreshold = 0;
-    public double zThreshold = 5.0f;
-    public static final double MAX_THRESHOLD = 10;
+    public double zThreshold = 7.0f;
+    public static final double MAX_THRESHOLD = 15;
     @Override
     public void onSensorChanged(SensorEvent event) {
         if(event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
@@ -128,7 +128,7 @@ public class BumpDetectionSystem implements SensorEventListener {
 
     final public double influence = 0.3f;
     private boolean processData(Double values[], double threshold) {
-
+        if(values.length != maxQueueSize) return false;
         double rawValues[] = new double[values.length];
         for(int i = 0; i < values.length; i++) {
             rawValues[i] = values[i];

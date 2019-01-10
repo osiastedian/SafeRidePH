@@ -36,9 +36,9 @@ public class Compass implements SensorEventListener {
 
     public void start() {
         sensorManager.registerListener(this, gsensor,
-                SensorManager.SENSOR_DELAY_GAME);
+                SensorManager.SENSOR_DELAY_FASTEST);
         sensorManager.registerListener(this, msensor,
-                SensorManager.SENSOR_DELAY_GAME);
+                SensorManager.SENSOR_DELAY_FASTEST);
     }
 
     public void stop() {

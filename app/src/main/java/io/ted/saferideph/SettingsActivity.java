@@ -137,4 +137,8 @@ public class SettingsActivity extends AppCompatActivity implements SeekBar.OnSee
     public void onStopTrackingTouch(SeekBar seekBar) {
 
     }
+
+    public void OnClick_SaveFab(View view){
+        onBackPressed();
+    }
 }
