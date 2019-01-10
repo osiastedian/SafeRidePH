@@ -715,7 +715,7 @@ public class SafeRide implements
         ownerActivity.runOnUiThread(new Runnable() {
           @Override
           public void run() {
-              if(lastLocation != null) {
+              if(lastLocation != null && lastSpeed > 0) {
                   FirebaseDatabase database = firebaseDatabase.getInstance();
                   DatabaseReference bumpDBRef = database.getReference().child("bumps").child(UUID.randomUUID().toString());
                   Bump bump = new Bump();
