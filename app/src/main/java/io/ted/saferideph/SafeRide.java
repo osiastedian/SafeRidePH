@@ -204,8 +204,10 @@ public class SafeRide implements
             new Runnable() {
                 @Override
                 public void run() {
-                    mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).zoom(zoomPreference).build()));
+                    if(mMap != null) {
+                        mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).zoom(zoomPreference).build()));
                     }
+                }
             }
         );
 
@@ -420,6 +422,7 @@ public class SafeRide implements
             }
         }
         else {
+            if(mMap != null)
             this.scanArea = mMap.addPolygon(getScanAreaOptions(this.lastLocation, angle, SCAN_RADIUS_IN_METERS, ARC_LENGTH));
         }
 
@@ -459,6 +462,7 @@ public class SafeRide implements
 
     @Override
     public void onCameraMove() {
+        if(mMap != null)
         Log.i("Camera", mMap.getCameraPosition().toString());
     }
 
@@ -492,18 +496,32 @@ public class SafeRide implements
             this.updateDistanceTraveled(location);
         }
         this.lastLocation = location;
-        LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
+        final LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
 //        if(this.myLocationMarker != null) {
 //            this.myLocationMarker.remove();
 //        }
 //        this.myLocationMarker = mMap.addMarker(new MarkerOptions().title(YOUR_LOCATION).position(latlng));
 
         if(!this.firstAnimateFinished){
-            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).target(latlng).zoom(this.zoomPreference).tilt(45).build()));
-            this.getCurrentPlaces();
+            ownerActivity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if(mMap != null)
+                        mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).target(latlng).zoom(zoomPreference).tilt(45).build()));
+                    getCurrentPlaces();
+                }
+            });
+
             this.firstAnimateFinished = true;
         } else {
-            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(this.lastAngle).tilt(45).target(latlng).build()));
+            ownerActivity.runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    if(mMap != null)
+                    mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(lastAngle).tilt(45).target(latlng).build()));
+                    getCurrentPlaces();
+                }
+            });
         }
         if(location.getSpeed() != 0 && isRecording) { locations.add(location); }
         drawScannedArea(this.lastAngle);
@@ -540,12 +558,16 @@ public class SafeRide implements
                 nearbyPlacesCollection) {
             if(this.lastScanArea != null && isPointOnScanArea(pos.createLatLng(), this.lastScanArea)) {
                 scannedPlaces.add(pos);
-                Marker marker = mMap.addMarker(new MarkerOptions().position(pos.createLatLng()).title(pos.getName()+"_"+joinStringArray(pos.getTypes(),",")));
-                nearbyScannedMarkers.add(marker);
+                if(mMap != null) {
+                    Marker marker = mMap.addMarker(new MarkerOptions().position(pos.createLatLng()).title(pos.getName() + "_" + joinStringArray(pos.getTypes(), ",")));
+                    nearbyScannedMarkers.add(marker);
+                }
             } else {
                 CircleOptions options = new CircleOptions().center(pos.createLatLng()).radius(5).strokeColor(Color.BLACK).fillColor(Color.BLACK);
-                Circle marker = mMap.addCircle(options);
-                nearbyPlacesCircles.add(marker);
+                if(mMap != null) {
+                    Circle marker = mMap.addCircle(options);
+                    nearbyPlacesCircles.add(marker);
+                }
             }
         }
 

@@ -49,7 +49,7 @@ public class BumpDetectionSystem implements SensorEventListener {
 
     public void start() {
         sensorManager.registerListener(this, accelerometer,
-                SensorManager.SENSOR_DELAY_NORMAL);
+                SensorManager.SENSOR_DELAY_GAME);
 //        sensorManager.registerListener(this, magneticField,
 //                SensorManager.SENSOR_DELAY_GAME);
     }
