@@ -71,4 +71,9 @@ public class WarningSystem implements TextToSpeech.OnInitListener {
     }
 
 
+    public void bumpDetected() {
+        if(onGoingWarning) return;
+        String text = "Bump Detected!";
+        textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, null, text);
+    }
 }

@@ -58,7 +58,9 @@ public class SafeRide implements
         ActivityCompat.OnRequestPermissionsResultCallback,
         LocationSource.OnLocationChangedListener,
         LocationListener,
-        BumpDetectionSystem.BumpListener
+        BumpDetectionSystem.BumpListener,
+        Compass.CompassListener
+
 {
 
     private static final int MY_PERMISSIONS_REQUEST_LOCATION = 10001;
@@ -67,6 +69,7 @@ public class SafeRide implements
     private double SCAN_RADIUS_IN_METERS = 200;
     private double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.5;
     private final float ARC_LENGTH = 20;
+    private boolean voiceOutBumpDetection = false;
 
 
     private Context context;
@@ -94,11 +97,11 @@ public class SafeRide implements
     private ArrayList<Location> locations;
     private double distanceTraveled = 0.0f;
     private double distanceCounterForFetch = 0.0f;
-    private float zoomPreference = 10;
+    private float zoomPreference = 15;
 
     private Polygon scanArea;
 
-    private SafeRideListener mListener;
+    private ArrayList<SafeRideListener> mListener;
     private Compass compass;
     private WarningSystem warningSystem;
     private BumpDetectionSystem bumpDetectionSystem;
@@ -112,7 +115,7 @@ public class SafeRide implements
     FirebaseDatabase firebaseDatabase;
 
 
-    public interface  SafeRideListener {
+    public interface SafeRideListener {
         void onSpeedChanged(double speed);
         void onLatitudeChanged(double latitude);
         void onLongitudeChanged(double longitude);
@@ -121,6 +124,7 @@ public class SafeRide implements
         void onDistanceTraveled(double distance);
         void onScannedPlaces(ArrayList<NearbyPlace> scannedPlaces);
         void onOverSpeedingUpdate(double excessSpeed);
+        void onSpeedLimitChanged(double lastSpeedLimit);
     }
 
     public SafeRide(final Activity activity, MapView mapView, Compass compass, WarningSystem warningSystem, FirebaseDatabase firebaseDatabase, BumpDetectionSystem bumpDetectionSystem) {
@@ -130,22 +134,11 @@ public class SafeRide implements
         this.compass = compass;
         this.warningSystem = warningSystem;
         this.bumpDetectionSystem = bumpDetectionSystem;
-        this.compass.setListener(new Compass.CompassListener() {
-            @Override
-            public void onNewAzimuth(final float azimuth) {
-                activity.runOnUiThread(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                updateDirection(azimuth);
-                            }
-                        }
-                );
-            }
-        });
+        this.compass.setListener(this);
         this.bumpDetectionSystem.setListener(this);
         this.locations = new ArrayList<>();
         this.firebaseDatabase = firebaseDatabase;
+        this.mListener = new ArrayList<>();
     }
 
     // Public Methods
@@ -155,13 +148,17 @@ public class SafeRide implements
         setUpLocationSource();
     }
 
-    public void setListener(SafeRideListener listener) {
-        this.mListener = listener;
+    public void addListener(SafeRideListener listener) {
+        if(this.mListener!= null)
+            mListener.add(listener);
     }
 
     public void startRecording() {
 
         locations.clear();
+        gpsUpdatesCount = 0;
+        networkUpdatesCount = 0;
+        distanceTraveled = 0;
         this.isRecording = true;
         this.currentTrip = new Trip();
         this.currentTrip.id = Calendar.getInstance().getTime().toString();
@@ -287,6 +284,14 @@ public class SafeRide implements
         this.overSpeedTolerate = overSpeedTolerate;
     }
 
+    public boolean isVoiceOutBumpDetection() {
+        return voiceOutBumpDetection;
+    }
+
+    public void setVoiceOutBumpDetection(boolean voiceOutBumpDetection) {
+        this.voiceOutBumpDetection = voiceOutBumpDetection;
+    }
+
     // Helper Methods
 
     private LatLng translate(LatLng original, float angle, double distance) {
@@ -365,14 +370,12 @@ public class SafeRide implements
     private void updateDistanceTraveled(Location newLocation) {
         double distance = gpsPointsToMetes(getDistance(this.lastLocation, newLocation));
         this.distanceTraveled +=  distance;
-        mListener.onDistanceTraveled(this.distanceTraveled);
-
         this.distanceCounterForFetch += distance;
         if(this.distanceCounterForFetch > DISTANCE_COUNTER_FETCH_CAP) {
             this.distanceCounterForFetch -= DISTANCE_COUNTER_FETCH_CAP;
             this.getCurrentPlaces();
         }
-        if(mListener != null) { mListener.onDistanceTraveled(this.distanceTraveled); }
+        updateListener();
     }
     private float directionUpdateAngleThreshold = 1;
 //    private float lastRecordAngle = 0.0f;
@@ -403,15 +406,27 @@ public class SafeRide implements
         this.clearNearbyMarkers();
         this.addNearbyMarkers(null);
     }
+
+    private void updateListener() {
+        for(SafeRideListener listener: mListener) {
+            listener.onDistanceTraveled(this.distanceTraveled);
+            listener.onLatitudeChanged(lastLocation.getLatitude());
+            listener.onLongitudeChanged(lastLocation.getLongitude());
+            listener.onSpeedChanged(lastSpeed);
+            listener.onOverSpeedingUpdate(lastSpeed - lastSpeedLimit);
+            listener.onGPSCountChanged(this.gpsUpdatesCount);
+            listener.onNetworkCountChanged(this.networkUpdatesCount);
+        }
+    }
+
+
     // Override Methods
-
-
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         mMap.setOnMyLocationButtonClickListener(this);
         mMap.setOnMyLocationClickListener(this);
-        mMap.setMinZoomPreference(12);
+        mMap.setMinZoomPreference(17);
         mMap.setOnCameraMoveListener(this);
         if (mMap != null) {
             if (ActivityCompat.checkSelfPermission(ownerActivity, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(ownerActivity, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
@@ -454,23 +469,22 @@ public class SafeRide implements
     @Override
     public void onLocationChanged(Location location) {
         String provider = location.getProvider();
-        if(provider.equals(LocationManager.GPS_PROVIDER)) {
-            mListener.onGPSCountChanged(gpsUpdatesCount++);
-        } else if(provider.equals(LocationManager.NETWORK_PROVIDER)) {
-            mListener.onNetworkCountChanged(networkUpdatesCount++);
+        if(provider.equals(LocationManager.GPS_PROVIDER) && isRecording) {
+            gpsUpdatesCount++;
+        } else if(provider.equals(LocationManager.NETWORK_PROVIDER) && isRecording) {
+            networkUpdatesCount++;
             return;
         }
         lastSpeed = location.getSpeed() * 3.6; // km/h
 
         if(this.lastLocation != null
-//                && lastSpeed != 0
+                && lastSpeed != 0
+                && isRecording
         ) {
             this.updateDistanceTraveled(location);
         }
         this.lastLocation = location;
         LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
-        mListener.onLatitudeChanged(location.getLatitude());
-        mListener.onLongitudeChanged(location.getLongitude());
         if(this.myLocationMarker != null) {
             this.myLocationMarker.remove();
         }
@@ -485,14 +499,7 @@ public class SafeRide implements
         }
         if(location.getSpeed() != 0 && isRecording) { locations.add(location); }
         drawScannedArea(this.lastAngle);
-        if(mListener != null) {
-            mListener.onLatitudeChanged(location.getLatitude());
-            mListener.onLongitudeChanged(location.getLongitude());
-            mListener.onSpeedChanged(lastSpeed);
-            mListener.onOverSpeedingUpdate(lastSpeed - lastSpeedLimit);
-            mListener.onGPSCountChanged(this.gpsUpdatesCount);
-            mListener.onNetworkCountChanged(this.networkUpdatesCount);
-        }
+        updateListener();
     }
 
     @Override
@@ -534,7 +541,9 @@ public class SafeRide implements
             }
         }
 
-        this.mListener.onScannedPlaces(scannedPlaces);
+        for(SafeRideListener listener: mListener) {
+            listener.onScannedPlaces(scannedPlaces);
+        }
         if(scannedPlaces.size() > 0) {
             processScannedPlaces(scannedPlaces);
         }
@@ -569,8 +578,25 @@ public class SafeRide implements
         Log.i("Warning Highest", mostPopulatedPlace.getName()+" : "+highestScore);
         Log.i("Warning Highest Dist", mostPopulatedPlace.getName()+" : "+distance);
         double speed = this.lastSpeed;
+        updateSpeedLimit(totalScore);
         if(shouldSlowDownUpcomingPlace(nearestPlaceDistance, speed)) {
             warningSystem.getSlowUpComing(nearestPlace.getName(), ScoringSystem.getHighscorePlaceType(nearestPlace), distance);
+        }
+    }
+
+    private void updateSpeedLimit(long score){
+        this.lastSpeedLimit = 30;
+        if(score > 50) {
+            this.lastSpeedLimit = 20;
+        } else if(score > 30) {
+            this.lastSpeedLimit = 30;
+        } else if(score > 10) {
+            this.lastSpeedLimit = 40;
+        } else {
+            this.lastSpeedLimit = 80;
+        }
+        for (SafeRideListener listener : mListener) {
+            listener.onSpeedLimitChanged(this.lastSpeedLimit);
         }
     }
 
@@ -660,10 +686,24 @@ public class SafeRide implements
             public void run() {
                 Date date = Calendar.getInstance().getTime();
                 String dateFormatted = date.toString();
-                if(lastLocation != null)
-                Toast.makeText(context, String.format(Locale.ENGLISH, "Bump on %f, %f at %s", lastLocation.getLatitude(), lastLocation.getLongitude(), dateFormatted), Toast.LENGTH_LONG).show();
+                if(lastLocation != null) {
+                    Toast.makeText(context, String.format(Locale.ENGLISH, "Bump on %f, %f at %s", lastLocation.getLatitude(), lastLocation.getLongitude(), dateFormatted), Toast.LENGTH_LONG).show();
+                    if(voiceOutBumpDetection)
+                        warningSystem.bumpDetected();
+                }
             }
         });
     }
 
+    @Override
+    public void onNewAzimuth(final float azimuth) {
+        ownerActivity.runOnUiThread(
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        updateDirection(azimuth);
+                    }
+                }
+        );
+    }
 }

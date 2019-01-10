@@ -19,59 +19,134 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <LinearLayout
+        <android.support.v7.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_marginBottom="10dp">
 
-            <TextView
-                android:id="@+id/bumpTextView"
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Bump Detection Threshold:" />
+                android:padding="10dp">
 
-            <SeekBar
-                android:id="@+id/bumpSeekbar"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/bumpSettingsHeader"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:text="Bump"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
 
-        <LinearLayout
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_below="@id/bumpSettingsHeader"
+                >
+
+                    <TextView
+                        android:id="@+id/bumpTextView"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Threshold" />
+
+                    <SeekBar
+                        android:id="@+id/bumpSeekbar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <Switch
+                        android:id="@+id/bumpVoiceOut"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Voice Out" />
+
+                </LinearLayout>
+            </RelativeLayout>
+        </android.support.v7.widget.CardView>
+
+        <android.support.v7.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_marginBottom="10dp">
 
-            <TextView
-                android:id="@+id/scanRadiusText"
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Scan Radius(meters):" />
+                android:padding="10dp">
 
-            <SeekBar
-                android:id="@+id/scannedRadiusSeekBar"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                <TextView
+                    android:id="@+id/scanningHeader"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:text="Scanning"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_below="@id/scanningHeader"
+                    android:padding="10dp">
 
-        </LinearLayout>
+                    <TextView
+                        android:id="@+id/scanRadiusText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Scan Radius(meters):" />
 
-        <LinearLayout
+                    <SeekBar
+                        android:id="@+id/scannedRadiusSeekBar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+            </RelativeLayout>
+
+        </android.support.v7.widget.CardView>
+
+        <android.support.v7.widget.CardView
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:layout_height="wrap_content">
 
-            <TextView
-                android:id="@+id/speedTolerateText"
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Over Speeding Toleration(meters):" />
+                android:padding="10dp">
 
-            <SeekBar
-                android:id="@+id/speedTolerateSeekBar"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:max="10" />
+                <TextView
+                    android:id="@+id/speedingHeader"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentStart="true"
+                    android:text="Speeding"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
 
-        </LinearLayout>
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_below="@id/speedingHeader"
+                    android:padding="10dp">
+
+                    <TextView
+                        android:id="@+id/speedTolerateText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Over Speeding Toleration(meters):" />
+
+                    <SeekBar
+                        android:id="@+id/speedTolerateSeekBar"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:max="10" />
+
+                </LinearLayout>
+            </RelativeLayout>
+        </android.support.v7.widget.CardView>
 
     </LinearLayout>
 </android.support.constraint.ConstraintLayout>

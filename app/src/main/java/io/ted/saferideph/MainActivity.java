@@ -13,6 +13,7 @@ import android.support.v7.widget.CardView;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Button;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -30,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 
 import static io.ted.saferideph.SettingsActivity.BUNDLE_BUMP_THRESHOLD;
+import static io.ted.saferideph.SettingsActivity.BUNDLE_BUMP_VOICE_OUT;
 import static io.ted.saferideph.SettingsActivity.BUNDLE_OVER_SPEED_TOLERATE;
 import static io.ted.saferideph.SettingsActivity.BUNDLE_SCAN_RADIUS;
 
@@ -97,6 +99,9 @@ public class MainActivity extends AppCompatActivity implements
     private TextView scannedPlacesTextView;
     private CardView speedCard;
     private TextView excessSpeedTextView;
+    private TextView speedLimitTextView;
+    private Button startButton;
+    private Button stopButton;
 
     private FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
     private DatabaseReference databaseReference = firebaseDatabase.getReference("trips");
@@ -164,6 +169,9 @@ public class MainActivity extends AppCompatActivity implements
         zoomSeekBar.setOnSeekBarChangeListener(this);
         speedCard = findViewById(R.id.speedCard);
         excessSpeedTextView = findViewById(R.id.excessSpeedTextView);
+        speedLimitTextView = findViewById(R.id.speedLimitTextView);
+        startButton = findViewById(R.id.startButton);
+        stopButton = findViewById(R.id.stopButton);
 
         this.loadTripsValueListener();
 
@@ -176,7 +184,7 @@ public class MainActivity extends AppCompatActivity implements
         this.bumpDetectionSystem = new BumpDetectionSystem(this);
         this.safeRide = new SafeRide(this, mapView, compass, warningSystem, firebaseDatabase, bumpDetectionSystem);
         this.safeRide.onCreate();
-        this.safeRide.setListener(this);
+        this.safeRide.addListener(this);
     }
 
     private void loadTripsValueListener() {
@@ -319,11 +327,15 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     public void onClick_StartButton(View view) {
+        startButton.setEnabled(false);
+        stopButton.setEnabled(true);
         safeRide.startRecording();
 
     }
 
     public void onClick_StopButton(View view) {
+        startButton.setEnabled(true);
+        stopButton.setEnabled(false);
         safeRide.stopRecording();
     }
 
@@ -333,6 +345,7 @@ public class MainActivity extends AppCompatActivity implements
         Intent intent = new Intent(this, SettingsActivity.class);
         intent.putExtra(BUNDLE_BUMP_THRESHOLD, bumpDetectionSystem.zThreshold);
         intent.putExtra(BUNDLE_SCAN_RADIUS,(int) safeRide.getScanRadius());
+        intent.putExtra(BUNDLE_BUMP_VOICE_OUT, safeRide.isVoiceOutBumpDetection());
         startActivityForResult(intent, SETTINGS_REQUEST_CODE);
     }
 
@@ -346,6 +359,8 @@ public class MainActivity extends AppCompatActivity implements
                     if(threshold != -1) {
                         this.bumpDetectionSystem.zThreshold = threshold;
                     }
+                    boolean voiceOut = bundle.getBoolean( BUNDLE_BUMP_VOICE_OUT, false);
+                    safeRide.setVoiceOutBumpDetection(voiceOut);
 
                     // RADIUS
 
@@ -461,6 +476,16 @@ public class MainActivity extends AppCompatActivity implements
                     speedTextView.setTextColor(Color.BLACK);
                     excessSpeedTextView.setText("");
                 }
+            }
+        });
+    }
+
+    @Override
+    public void onSpeedLimitChanged(final double speedLimit) {
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                speedLimitTextView.setText(String.format(Locale.ENGLISH, "Limit: %.0fkm/h", speedLimit ));
             }
         });
     }

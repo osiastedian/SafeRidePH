@@ -64,7 +64,7 @@ public class BumpDetectionSystem implements SensorEventListener {
 
     public double xThreshold = 0;
     public double yThreshold = 0;
-    public double zThreshold = 4.7;
+    public double zThreshold = 5.0f;
     public static final double MAX_THRESHOLD = 10;
     @Override
     public void onSensorChanged(SensorEvent event) {

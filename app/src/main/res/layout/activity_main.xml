@@ -22,6 +22,7 @@
     <RelativeLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
+
         <SeekBar
             android:id="@+id/zoomSeekBar"
             style="@style/Widget.AppCompat.SeekBar.Discrete"
@@ -57,54 +58,109 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Traveled: 0.0m"
-                        android:textColor="@android:color/white" />
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp" />
 
                     <TextView
                         android:id="@+id/scannedPlacesCount"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Scanned Places:"
-                        android:textColor="@android:color/white" />
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp" />
 
                     <TextView
                         android:id="@+id/textViewLat"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Lattitude:"
-                        android:textColor="@android:color/white" />
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp" />
 
                     <TextView
                         android:id="@+id/textViewLong"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Longitude:"
-                        android:textColor="@android:color/white" />
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp" />
 
                     <TextView
                         android:id="@+id/gpsUpdateTextView"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="GPS:"
-                        android:textColor="@android:color/white" />
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp" />
 
                     <TextView
                         android:id="@+id/netowkrUpdateTextView"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Network:"
-                        android:textColor="@android:color/white" />
+                        android:textColor="@android:color/white"
+                        android:textSize="16sp" />
 
                 </LinearLayout>
 
-                <Button
-                    android:id="@+id/settingsButton"
+                <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
+                    android:orientation="vertical"
                     android:layout_alignParentRight="true"
                     android:layout_alignParentTop="true"
-                    android:onClick="onClick_SettingsButton"
-                    android:text="Settings" />
+                >
 
+                    <Button
+                        android:id="@+id/settingsButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:onClick="onClick_SettingsButton"
+                        android:text="Settings" />
+                    <Button
+                        android:id="@+id/startButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:onClick="onClick_StartButton"
+                        android:text="START" />
+
+                    <Button
+                        android:id="@+id/stopButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:onClick="onClick_StopButton"
+                        android:enabled="false"
+                        android:text="STOP" />
+                </LinearLayout>
+
+            </RelativeLayout>
+        </android.support.v7.widget.CardView>
+
+        <android.support.v7.widget.CardView
+            android:id="@+id/speedLimitCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/speedCard"
+            android:layout_marginLeft="10dp"
+            android:layout_marginRight="10dp"
+            app:cardBackgroundColor="@color/cardview_dark_background"
+        >
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingTop="10dp"
+                android:paddingBottom="10dp"
+            >
+
+                <TextView
+                    android:id="@+id/speedLimitTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Limit: 0km/h"
+                    android:textColor="@android:color/white"
+                    android:textSize="30sp" />
             </RelativeLayout>
         </android.support.v7.widget.CardView>
 
@@ -113,10 +169,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
-            android:layout_marginBottom="0dp"
             android:layout_marginLeft="5dp"
             android:layout_marginRight="5dp"
-            android:layout_marginTop="0dp">
+            android:layout_marginTop="10dp">
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -128,18 +183,17 @@
                     android:id="@+id/speedTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="100 km/h"
-                    android:textSize="36sp" />
+                    android:text="0 km/h"
+                    android:textSize="40sp" />
 
                 <TextView
                     android:id="@+id/excessSpeedTextView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_toRightOf="@id/speedTextView"
+                    android:layout_toEndOf="@id/speedTextView"
                     android:gravity="center"
-                    android:text="(+99)"
                     android:textColor="@android:color/white"
-                    android:textSize="36sp" />
+                    android:textSize="40sp" />
             </RelativeLayout>
 
         </android.support.v7.widget.CardView>
@@ -161,33 +215,13 @@
             android:layout_alignParentBottom="true"
             android:orientation="horizontal"
             tools:ignore="UselessParent">
-
-            <Button
-                android:id="@+id/startButton"
-                style="@style/Widget.AppCompat.Button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:onClick="onClick_StartButton"
-                android:text="START" />
-
-            <Button
-                android:id="@+id/stopButton"
-                style="@style/Widget.AppCompat.Button"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:onClick="onClick_StopButton"
-                android:text="STOP" />
-
-            <Button
-                android:id="@+id/testButton"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:onClick="onTest"
-                android:text="TEST" />
-
+            <!--<Button-->
+                <!--android:id="@+id/testButton"-->
+                <!--android:layout_width="0dp"-->
+                <!--android:layout_height="wrap_content"-->
+                <!--android:layout_weight="1"-->
+                <!--android:onClick="onTest"-->
+                <!--android:text="TEST" />-->
         </LinearLayout>
 
     </RelativeLayout>
