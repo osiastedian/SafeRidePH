@@ -8,10 +8,10 @@ import android.graphics.Color;
 import android.location.Location;
 import android.location.LocationListener;
 import android.location.LocationManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -42,13 +42,12 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import io.ted.saferideph.models.Bump;
 import io.ted.saferideph.models.Trip;
@@ -112,6 +111,8 @@ public class SafeRide implements
 
     private ArrayList<Circle> nearbyPlacesCircles = new ArrayList<>();
     private ArrayList<Marker> nearbyScannedMarkers = new ArrayList<>();
+    private ArrayList<Circle> bumpsScannedCircles = new ArrayList<>();
+
     private ArrayList<NearbyPlace> nearbyPlacesCollection = new ArrayList<>();
 
     private boolean isRecording = false;
@@ -138,6 +139,7 @@ public class SafeRide implements
         this.compass = compass;
         this.warningSystem = warningSystem;
         this.bumpDetectionSystem = bumpDetectionSystem;
+        this.bumpDetectionSystem.startEventListener(firebaseDatabase);
         this.compass.setListener(this);
         this.bumpDetectionSystem.setListener(this);
         this.locations = new ArrayList<>();
@@ -222,13 +224,28 @@ public class SafeRide implements
         this.getCurrentPlaces(null);
     }
 
+    public ArrayList<Bump> getBumpsAhead(ConcurrentHashMap<String, Bump> bumpMap, double radius) {
+        if(bumpMap == null || radius <= 0) return  null;
+        LatLng ahead = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
+//        ahead = translate(ahead, this.lastAngle, SCAN_RADIUS_IN_METERS);
+        LatLng tempLatlng;
+        ArrayList<Bump> bumpsAhead = new ArrayList<>();
+        for (Bump bump : bumpMap.values()) {
+            tempLatlng = new LatLng(bump.latitude, bump.longitude);
+            if(isPointOnScanArea(tempLatlng)) {
+                bumpsAhead.add(bump);
+            }
+        }
+        return bumpsAhead;
+    }
+
     public void getCurrentPlaces(String pageToken) {
         if(currentPagesLoaded > 10) {
             return;
         }
         RequestQueue queue = Volley.newRequestQueue(ownerActivity);
         LatLng ahead = new LatLng(lastLocation.getLatitude(), lastLocation.getLongitude());
-        ahead = translate(ahead, this.lastAngle, SCAN_RADIUS_IN_METERS);
+//        ahead = translate(ahead, this.lastAngle, SCAN_RADIUS_IN_METERS);
         double latitude = ahead.latitude;
         double longitude = ahead.longitude;
         String key = "AIzaSyASG1Kwhyrz8XTJdJsGfKDJ8XYby-rjNMs";
@@ -236,7 +253,6 @@ public class SafeRide implements
         String url = baseUrl +
                 String.format(Locale.ENGLISH, "location=%f,%f", latitude, longitude)+
                 String.format(Locale.ENGLISH, "&radius=%.0f", SCAN_RADIUS_IN_METERS * 1.0) +
-//                "&type=store" +
                 String.format(Locale.ENGLISH, "&key=%s", key);
         if(pageToken != null) {
             url = baseUrl + "pagetoken="+ pageToken + "&key=" + key;
@@ -269,10 +285,10 @@ public class SafeRide implements
                         places.add(place);
                     }
                     addNearbyMarkers(places);
-//                    if(nextPageToken != null && nextPageToken.length() > 0) {
-//                        currentPagesLoaded++;
-//                        getCurrentPlaces(nextPageToken);
-//                    }
+                    if(nextPageToken != null && nextPageToken.length() > 0) {
+                        currentPagesLoaded++;
+                        getCurrentPlaces(nextPageToken);
+                    }
 
 
                 } catch (JSONException exception) {
@@ -313,6 +329,14 @@ public class SafeRide implements
 
     // Helper Methods
 
+    private LatLng translate(Location original, float angle, double distance) {
+        distance /= 1000;
+        distance /= 110.567;
+        double lat = original.getLatitude()  + (distance * Math.cos(Math.PI / 180 * angle));
+        double lng = original.getLongitude() + (distance * Math.sin(Math.PI / 180 * angle));
+        return new LatLng(lat, lng);
+    }
+
     private LatLng translate(LatLng original, float angle, double distance) {
         distance /= 1000;
         distance /= 110.567;
@@ -329,6 +353,10 @@ public class SafeRide implements
             return false;
         }
         return true;
+    }
+
+    private double getDistance(double x1, double y1, double x2, double y2) {
+        return Math.sqrt(Math.pow(x1 - x2,2) + Math.pow(y1 - y2,2));
     }
 
     private double getDistance(Location firstLoc, Location secondLoc) {
@@ -400,7 +428,6 @@ public class SafeRide implements
         updateListener();
     }
     private float directionUpdateAngleThreshold = 1;
-//    private float lastRecordAngle = 0.0f;
 
     private void updateDirection(float angle){
         Log.i("COMPASS", "Direction: "+angle);
@@ -427,7 +454,9 @@ public class SafeRide implements
         }
 
         this.clearNearbyMarkers();
+        this.clearBumpCircles();
         this.addNearbyMarkers(null);
+        this.loadScannedBumps(bumpDetectionSystem.getBumpsMap());
     }
 
     private void updateListener() {
@@ -497,31 +526,16 @@ public class SafeRide implements
         }
         this.lastLocation = location;
         final LatLng latlng = new LatLng(location.getLatitude(), location.getLongitude());
-//        if(this.myLocationMarker != null) {
-//            this.myLocationMarker.remove();
-//        }
-//        this.myLocationMarker = mMap.addMarker(new MarkerOptions().title(YOUR_LOCATION).position(latlng));
 
         if(!this.firstAnimateFinished){
-            ownerActivity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if(mMap != null)
-                        mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).target(latlng).zoom(zoomPreference).tilt(45).build()));
-                    getCurrentPlaces();
-                }
-            });
-
+            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).target(latlng).zoom(zoomPreference).tilt(45).build()));
+            getCurrentPlaces();
             this.firstAnimateFinished = true;
         } else {
-            ownerActivity.runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if(mMap != null)
-                    mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(lastAngle).tilt(45).target(latlng).build()));
-                    getCurrentPlaces();
-                }
-            });
+
+            if(mMap != null)
+                mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(lastAngle).tilt(45).target(latlng).build()));
+
         }
         if(location.getSpeed() != 0 && isRecording) { locations.add(location); }
         drawScannedArea(this.lastAngle);
@@ -556,7 +570,9 @@ public class SafeRide implements
         ArrayList<NearbyPlace> scannedPlaces = new ArrayList<>();
         for (NearbyPlace pos :
                 nearbyPlacesCollection) {
-            if(this.lastScanArea != null && isPointOnScanArea(pos.createLatLng(), this.lastScanArea)) {
+            if(this.lastScanArea != null
+                    && isPointOnScanArea(pos.createLatLng())
+                ) {
                 scannedPlaces.add(pos);
                 if(mMap != null) {
                     Marker marker = mMap.addMarker(new MarkerOptions().position(pos.createLatLng()).title(pos.getName() + "_" + joinStringArray(pos.getTypes(), ",")));
@@ -696,6 +712,28 @@ public class SafeRide implements
         nearbyScannedMarkers.clear();
     }
 
+    public void clearBumpCircles() {
+        for(Circle circle: bumpsScannedCircles) {
+            circle.remove();
+        }
+        bumpsScannedCircles.clear();
+    }
+
+    private boolean isPointOnScanArea(LatLng loc) {
+        double distance = getDistance(loc.latitude, loc.longitude, lastLocation.getLatitude(), lastLocation.getLongitude());
+        distance = gpsPointsToMetes(distance);
+        if(distance > SCAN_RADIUS_IN_METERS) return false;
+        LatLng p2 = translate(lastLocation, this.lastAngle, SCAN_RADIUS_IN_METERS);
+        double sideA = getDistance(loc.latitude, loc.longitude, p2.latitude, p2.longitude);
+        double sideB = getDistance(lastLocation.getLatitude(), lastLocation.getLongitude(), loc.latitude, loc.longitude);
+        double sideC = getDistance(lastLocation.getLatitude(), lastLocation.getLongitude(), p2.latitude, p2.longitude);
+        double right = Math.pow(sideB, 2) + Math.pow(sideC, 2) - Math.pow(sideA, 2);
+        right = right / (2 * sideB * sideC);
+        double degrees = Math.acos(right);
+        degrees = Math.toDegrees(degrees);
+        return degrees < (ARC_LENGTH / 2);
+    }
+
     private boolean isPointOnScanArea(LatLng loc, List<LatLng> scanArea) {
         LatLng p2 = scanArea.get(scanArea.size() - 1);
         boolean result = false;
@@ -740,6 +778,19 @@ public class SafeRide implements
           }
         });
 
+    }
+
+    public void loadScannedBumps(ConcurrentHashMap<String, Bump> updatedMap) {
+        ArrayList<Bump> bumps = getBumpsAhead(updatedMap, SCAN_RADIUS_IN_METERS);
+        clearBumpCircles();
+        for(Bump bump: bumps) {
+            CircleOptions options = new CircleOptions()
+                    .fillColor(Color.GREEN)
+                    .strokeColor(Color.GREEN)
+                    .radius(5)
+                    .center(new LatLng(bump.latitude, bump.longitude));
+            bumpsScannedCircles.add(mMap.addCircle(options));
+        }
     }
 
     @Override

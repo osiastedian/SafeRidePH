@@ -6,25 +6,31 @@ import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.util.Log;
 
-//import com.google.common.math.Stats;
-//import com.google.common.math.StatsAccumulator;
+import com.google.firebase.database.ChildEventListener;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
-import java.lang.reflect.Array;
-import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
+
+import io.ted.saferideph.models.Bump;
 
 public class BumpDetectionSystem implements SensorEventListener {
 
     final static String LOG_TAG = "BMP_DETECT";
-
+    final static String LOG_TAG_FIREBASE = "BMP_DETECT_FIREBASE";
     Activity ownerActivty;
 
     SensorManager sensorManager;
     Sensor accelerometer;
-    Sensor magneticField;
 
     public interface BumpListener {
         void onBump(long timestamp);
@@ -37,21 +43,17 @@ public class BumpDetectionSystem implements SensorEventListener {
     ArrayBlockingQueue xQueue = new ArrayBlockingQueue<Double>(maxQueueSize);
     ArrayBlockingQueue yQueue = new ArrayBlockingQueue<Double>(maxQueueSize);
     ArrayBlockingQueue zQueue = new ArrayBlockingQueue<Double>(maxQueueSize);
-    boolean isFirst = true;
 
     public BumpDetectionSystem(Activity ownerActivty) {
         this.ownerActivty = ownerActivty;
         sensorManager = (SensorManager) ownerActivty.getApplicationContext()
                 .getSystemService(Context.SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-//        magneticField = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
     }
 
     public void start() {
         sensorManager.registerListener(this, accelerometer,
                 SensorManager.SENSOR_DELAY_GAME);
-//        sensorManager.registerListener(this, magneticField,
-//                SensorManager.SENSOR_DELAY_GAME);
     }
 
     public void stop() {
@@ -217,6 +219,54 @@ public class BumpDetectionSystem implements SensorEventListener {
 
     @Override
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+    }
+    ChildEventListener bumpListener;
+    private  ConcurrentHashMap<String, Bump> bumpsMap = new ConcurrentHashMap<>();
+    public ChildEventListener startEventListener(FirebaseDatabase firebaseDatabase) {
+        DatabaseReference databaseReference = firebaseDatabase.getReference("bumps");
+
+        bumpListener = databaseReference.addChildEventListener(new ChildEventListener() {
+            @Override
+            public void onChildAdded(@NonNull DataSnapshot dataSnapshot, @Nullable String s) {
+                String key = dataSnapshot.getKey();
+                Bump bump = mapToBump((HashMap)dataSnapshot.getValue());
+                bumpsMap.put(key, bump);
+                Log.i(BumpDetectionSystem.LOG_TAG_FIREBASE, "ChildAdded" + bump.toString());
+            }
+
+            @Override
+            public void onChildChanged(@NonNull DataSnapshot dataSnapshot, @Nullable String s) {
+                Log.i(BumpDetectionSystem.LOG_TAG_FIREBASE, "onChildChanged");
+            }
+
+            @Override
+            public void onChildRemoved(@NonNull DataSnapshot dataSnapshot) {
+                Log.i(BumpDetectionSystem.LOG_TAG_FIREBASE, "ChildRemoved");
+            }
+
+            @Override
+            public void onChildMoved(@NonNull DataSnapshot dataSnapshot, @Nullable String s) {
+                Log.i(BumpDetectionSystem.LOG_TAG_FIREBASE, "ChildMoved");
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.i(BumpDetectionSystem.LOG_TAG_FIREBASE, "onCancelled");
+            }
+        });
+        return  bumpListener;
+    }
+
+    public ConcurrentHashMap<String, Bump> getBumpsMap() {
+        return bumpsMap;
+    }
+
+    public static Bump mapToBump(HashMap hashMap) {
+        Bump bump = new Bump();
+        bump.latitude = ((Double)hashMap.get("latitude")).doubleValue();
+        bump.longitude = ((Double)hashMap.get("longitude")).doubleValue();
+        return bump;
 
     }
 }
