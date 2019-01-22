@@ -10,6 +10,7 @@ import java.util.Date;
 @IgnoreExtraProperties
 public class Trip {
     public ArrayList<Location> locations;
+    public ArrayList<Double> speedLimits;
     public String id;
     public Date date;
 

@@ -25,14 +25,16 @@
 
         <FrameLayout
             android:id="@+id/cameraPreview"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content">
+            android:layout_alignParentBottom="true"
+            android:layout_alignParentEnd="true"
+            android:layout_width="800px"
+            android:layout_height="600px">
 
         </FrameLayout>
     </RelativeLayout>
 
     <RelativeLayout
-        android:layout_width="match_parent"
+        android:layout_width="650px"
         android:layout_height="match_parent">
 
         <SeekBar
@@ -182,15 +184,16 @@
             android:layout_height="wrap_content"
             android:layout_alignParentTop="true"
             android:layout_marginLeft="5dp"
-            android:layout_marginRight="5dp"
-            android:layout_marginTop="10dp">
+            android:layout_marginTop="10dp"
+            android:layout_marginRight="5dp">
+
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:paddingTop="10dp"
-                android:paddingBottom="10dp"
-            >
+                android:paddingBottom="10dp">
+
                 <TextView
                     android:id="@+id/speedTextView"
                     android:layout_width="wrap_content"

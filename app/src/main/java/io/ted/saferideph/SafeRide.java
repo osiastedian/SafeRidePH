@@ -69,9 +69,10 @@ public class SafeRide implements
     public static final int MIN_RADIUS = 100;
     public static final int MINIMUM_ZOOM_PREF = 15;
     public static final int MAXIMUM_ZOOM_PREF = 21;
+    public static final String OVER_SPEED_INDEX = "trips";
     private double SCAN_RADIUS_IN_METERS = 200;
-    private double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.5;
-    private final float ARC_LENGTH = 20;
+    private double DISTANCE_COUNTER_FETCH_CAP = SCAN_RADIUS_IN_METERS * 0.5f;
+    private final float ARC_LENGTH = 40;
     private boolean voiceOutBumpDetection = false;
 
 
@@ -98,6 +99,7 @@ public class SafeRide implements
     private final String YOUR_LOCATION = "Your Location";
     private boolean firstAnimateFinished = false;
     private ArrayList<Location> locations;
+    private ArrayList<Double> speedLimits;
     private double distanceTraveled = 0.0f;
     private double distanceCounterForFetch = 0.0f;
     private float zoomPreference = 15;
@@ -178,12 +180,8 @@ public class SafeRide implements
         FirebaseDatabase database = firebaseDatabase.getInstance();
         this.isRecording = false;
         this.currentTrip.locations = locations;
-//        String year = new SimpleDateFormat("yyyy").format(this.currentTrip.date);
-//        String month = new SimpleDateFormat("MM").format(this.currentTrip.date);
-//        String day = new SimpleDateFormat("dd").format(this.currentTrip.date);
-        DatabaseReference tripDBRef = database.getReference().child("trips")
-//                .child(year).child(month).child(day)
-                .child(this.currentTrip.id);
+        this.currentTrip.speedLimits = speedLimits;
+        DatabaseReference tripDBRef = database.getReference().child(OVER_SPEED_INDEX).child(this.currentTrip.id);
         tripDBRef.setValue(this.currentTrip).addOnSuccessListener(new OnSuccessListener<Void>() {
             @Override
             public void onSuccess(Void aVoid) {
@@ -218,9 +216,6 @@ public class SafeRide implements
     public int currentPagesLoaded = 0;
 
     public void getCurrentPlaces() {
-        currentPagesLoaded = 0;
-        this.clearNearbyMarkers();
-        this.nearbyPlacesCollection.clear();
         this.getCurrentPlaces(null);
     }
 
@@ -239,7 +234,7 @@ public class SafeRide implements
         return bumpsAhead;
     }
 
-    public void getCurrentPlaces(String pageToken) {
+    public void getCurrentPlaces(final String pageToken) {
         if(currentPagesLoaded > 10) {
             return;
         }
@@ -260,12 +255,17 @@ public class SafeRide implements
         JsonObjectRequest request = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
             @Override
             public void onResponse(JSONObject response) {
+                if(pageToken == null) {
+                    currentPagesLoaded = 0;
+                    clearNearbyMarkers();
+                    nearbyPlacesCollection.clear();
+                }
                 String responseStr = response.toString();
                 try {
-                    String nextPageToken = null;
-                    if(response.has("next_page_token")) {
-                        nextPageToken = response.getString("next_page_token");
-                    }
+//                    String nextPageToken = null;
+//                    if(response.has("next_page_token")) {
+//                        nextPageToken = response.getString("next_page_token");
+//                    }
                     JSONArray results = response.getJSONArray("results");
                     ArrayList<NearbyPlace> places = new ArrayList<>();
                     for(int i = 0; i < results.length() ; i++) {
@@ -285,10 +285,10 @@ public class SafeRide implements
                         places.add(place);
                     }
                     addNearbyMarkers(places);
-                    if(nextPageToken != null && nextPageToken.length() > 0) {
-                        currentPagesLoaded++;
-                        getCurrentPlaces(nextPageToken);
-                    }
+//                    if(nextPageToken != null && nextPageToken.length() > 0) {
+//                        currentPagesLoaded++;
+//                        getCurrentPlaces(nextPageToken);
+//                    }
 
 
                 } catch (JSONException exception) {
@@ -431,6 +431,7 @@ public class SafeRide implements
 
     private void updateDirection(float angle){
         Log.i("COMPASS", "Direction: "+angle);
+        angle = (angle + 90.0f) % 360.0f;
         float diff = Math.abs(lastAngle - angle);
         // Added
         if( diff > directionUpdateAngleThreshold) {
@@ -469,6 +470,12 @@ public class SafeRide implements
             listener.onGPSCountChanged(this.gpsUpdatesCount);
             listener.onNetworkCountChanged(this.networkUpdatesCount);
         }
+    }
+
+    private boolean isOverSpeeding(Location location) {
+        double lastSpeed = location.getSpeed() * 3.6;
+        double excess = lastSpeed - lastSpeedLimit;
+        return  excess > overSpeedTolerate;
     }
 
 
@@ -519,8 +526,7 @@ public class SafeRide implements
         lastSpeed = location.getSpeed() * 3.6; // km/h
 
         if(this.lastLocation != null
-                && lastSpeed != 0
-                && isRecording
+                && lastSpeed > 0
         ) {
             this.updateDistanceTraveled(location);
         }
@@ -537,8 +543,18 @@ public class SafeRide implements
                 mMap.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.builder(mMap.getCameraPosition()).bearing(lastAngle).tilt(45).target(latlng).build()));
 
         }
-        if(location.getSpeed() != 0 && isRecording) { locations.add(location); }
+        if(location.getSpeed() != 0 && isRecording) {
+            locations.add(location);
+            speedLimits.add(lastSpeedLimit);
+        }
         drawScannedArea(this.lastAngle);
+
+        boolean isOverSpeeding = isOverSpeeding(location);
+        if(isRecording && !isOverSpeeding) {
+            stopRecording();
+        } else if(!isRecording && isOverSpeeding) {
+            startRecording();
+        }
         updateListener();
     }
 

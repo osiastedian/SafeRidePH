@@ -1,6 +1,9 @@
 package io.ted.saferideph;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.hardware.Camera;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -8,6 +11,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.FrameLayout;
 import android.widget.NumberPicker;
 import android.widget.SeekBar;
 import android.widget.Switch;
@@ -33,7 +37,6 @@ public class SettingsActivity extends AppCompatActivity implements SeekBar.OnSee
     TextView speedTolerateText;
     SeekBar speedTolerateSeekBar;
     Switch bumpVoiceOut;
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -141,4 +144,5 @@ public class SettingsActivity extends AppCompatActivity implements SeekBar.OnSee
     public void OnClick_SaveFab(View view){
         onBackPressed();
     }
+
 }

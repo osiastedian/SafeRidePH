@@ -2,9 +2,12 @@ package io.ted.saferideph;
 
 import android.Manifest;
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.hardware.Camera;
+import android.opengl.Visibility;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.NonNull;
@@ -17,6 +20,7 @@ import android.util.Log;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -108,6 +112,7 @@ public class MainActivity extends AppCompatActivity implements
     private TextView speedLimitTextView;
     private Button startButton;
     private Button stopButton;
+    private Button settingsButton;
 
     private FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
     private DatabaseReference databaseReference = firebaseDatabase.getReference("trips");
@@ -123,9 +128,8 @@ public class MainActivity extends AppCompatActivity implements
 
     private SeekBar zoomSeekBar;
 
-    private SeekBar xSeekbar;
-    private SeekBar ySeekbar;
-    private SeekBar zSeekbar;
+    private Camera mCamera;
+    CameraPreview mPreview;
 
 
 
@@ -178,6 +182,7 @@ public class MainActivity extends AppCompatActivity implements
         speedLimitTextView = findViewById(R.id.speedLimitTextView);
         startButton = findViewById(R.id.startButton);
         stopButton = findViewById(R.id.stopButton);
+        settingsButton = findViewById(R.id.settingsButton);
 
         this.loadTripsValueListener();
 
@@ -191,6 +196,21 @@ public class MainActivity extends AppCompatActivity implements
         this.safeRide = new SafeRide(this, mapView, compass, warningSystem, firebaseDatabase, bumpDetectionSystem);
         this.safeRide.onCreate();
         this.safeRide.addListener(this);
+
+
+        // DEBUG
+        startButton.setVisibility(View.INVISIBLE);
+        stopButton.setVisibility(View.INVISIBLE);
+//        settingsButton.setVisibility(View.INVISIBLE);
+
+        FrameLayout previewLayout = findViewById(R.id.cameraPreview);
+//        if(checkCameraHardware(this)) {
+            this.mCamera = getCameraInstance();
+            mPreview = new CameraPreview(this, mCamera);
+            previewLayout.addView(mPreview);
+//        } else {
+//         previewLayout.setVisibility(View.INVISIBLE);
+//        }
     }
 
     private void loadTripsValueListener() {
@@ -251,6 +271,8 @@ public class MainActivity extends AppCompatActivity implements
         mapView.onResume();
         compass.start();
         bumpDetectionSystem.start();
+        this.mPreview.setCamera(getCameraInstance());
+
     }
 
     @Override
@@ -274,6 +296,7 @@ public class MainActivity extends AppCompatActivity implements
         mapView.onPause();
         compass.stop();
         bumpDetectionSystem.stop();
+        releaseCamera();
         super.onPause();
     }
 
@@ -282,6 +305,7 @@ public class MainActivity extends AppCompatActivity implements
         mapView.onDestroy();
         compass.stop();
         bumpDetectionSystem.stop();
+        releaseCamera();
         super.onDestroy();
     }
 
@@ -513,6 +537,42 @@ public class MainActivity extends AppCompatActivity implements
                     }
                 }
             } break;
+        }
+    }
+
+
+    private boolean checkCameraHardware(Context context) {
+        if (context.getPackageManager().hasSystemFeature(PackageManager.FEATURE_CAMERA)){
+            // this device has a camera
+            return true;
+        } else {
+            // no camera on this device
+            return false;
+        }
+    }
+
+    private static Camera getCameraInstance()
+    {
+        Camera camera1;
+        try
+        {
+            if (android.os.Build.VERSION.SDK_INT >= 9)
+            {
+                return Camera.open(0);
+            }
+            camera1 = Camera.open();
+        }
+        catch (Exception exception)
+        {
+            return null;
+        }
+        return camera1;
+    }
+
+    private void releaseCamera(){
+        if (mCamera != null){
+            mCamera.release();        // release the camera for other applications
+            mCamera = null;
         }
     }
 }

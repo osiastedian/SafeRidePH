@@ -148,5 +148,17 @@
             </RelativeLayout>
         </android.support.v7.widget.CardView>
 
+        <android.support.v7.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <FrameLayout
+                android:id="@+id/previewLayout"
+                android:layout_width="960px"
+                android:layout_height="600px">
+
+            </FrameLayout>
+        </android.support.v7.widget.CardView>
+
     </LinearLayout>
 </android.support.constraint.ConstraintLayout>
