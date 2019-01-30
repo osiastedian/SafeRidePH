@@ -18,42 +18,45 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <com.google.android.gms.maps.MapView
-            android:id="@+id/mapView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
         <FrameLayout
             android:id="@+id/cameraPreview"
-            android:layout_alignParentBottom="true"
-            android:layout_alignParentEnd="true"
-            android:layout_width="800px"
-            android:layout_height="600px">
-
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
         </FrameLayout>
-    </RelativeLayout>
 
-    <RelativeLayout
-        android:layout_width="650px"
-        android:layout_height="match_parent">
+        <com.google.android.gms.maps.MapView
+            android:id="@+id/mapView"
+            android:layout_width="150dp"
+            android:layout_height="150dp"
+            android:layout_below="@id/zoomSeekBar"
+            android:layout_alignParentEnd="true"
+            android:layout_alignParentBottom="false" />
 
         <SeekBar
             android:id="@+id/zoomSeekBar"
             style="@style/Widget.AppCompat.SeekBar.Discrete"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_above="@id/locationDetailsCard"
-            android:layout_marginBottom="0dp"
+            android:layout_alignStart="@+id/mapView"
             android:max="6"
+            android:padding="0dp"
+            android:paddingBottom="0dp"
             android:progress="0" />
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:layout_width="800px"
+        android:layout_height="match_parent">
 
         <android.support.v7.widget.CardView
             android:id="@+id/locationDetailsCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
-            android:layout_margin="5dp"
-            android:layout_marginTop="-95dp"
+            android:layout_marginStart="5dp"
+            android:layout_marginTop="5dp"
+            android:layout_marginEnd="5dp"
+            android:layout_marginBottom="5dp"
             app:cardBackgroundColor="@color/cardview_dark_background">
 
             <RelativeLayout
@@ -120,17 +123,21 @@
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:layout_alignParentRight="true"
                     android:layout_alignParentTop="true"
-                >
+                    android:layout_alignParentRight="true"
+                    android:orientation="vertical">
 
                     <Button
                         android:id="@+id/settingsButton"
+                        style="@style/Widget.AppCompat.Button"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:background="@android:color/transparent"
+                        android:drawableEnd="@drawable/ic_settings_black_24dp"
                         android:onClick="onClick_SettingsButton"
-                        android:text="Settings" />
+                        android:paddingEnd="30px"
+                        android:textAlignment="center" />
+
                     <Button
                         android:id="@+id/startButton"
                         android:layout_width="wrap_content"
@@ -143,8 +150,8 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:onClick="onClick_StopButton"
                         android:enabled="false"
+                        android:onClick="onClick_StopButton"
                         android:text="STOP" />
                 </LinearLayout>
 
@@ -158,15 +165,14 @@
             android:layout_below="@id/speedCard"
             android:layout_marginLeft="10dp"
             android:layout_marginRight="10dp"
-            app:cardBackgroundColor="@color/cardview_dark_background"
-        >
+            app:cardBackgroundColor="@color/cardview_dark_background">
+
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:paddingTop="10dp"
-                android:paddingBottom="10dp"
-            >
+                android:paddingBottom="10dp">
 
                 <TextView
                     android:id="@+id/speedLimitTextView"

@@ -113,6 +113,7 @@ public class MainActivity extends AppCompatActivity implements
     private Button startButton;
     private Button stopButton;
     private Button settingsButton;
+    private CardView locationDetailsCard;
 
     private FirebaseDatabase firebaseDatabase = FirebaseDatabase.getInstance();
     private DatabaseReference databaseReference = firebaseDatabase.getReference("trips");
@@ -183,6 +184,7 @@ public class MainActivity extends AppCompatActivity implements
         startButton = findViewById(R.id.startButton);
         stopButton = findViewById(R.id.stopButton);
         settingsButton = findViewById(R.id.settingsButton);
+        locationDetailsCard = findViewById(R.id.locationDetailsCard);
 
         this.loadTripsValueListener();
 
@@ -199,9 +201,7 @@ public class MainActivity extends AppCompatActivity implements
 
 
         // DEBUG
-        startButton.setVisibility(View.INVISIBLE);
-        stopButton.setVisibility(View.INVISIBLE);
-//        settingsButton.setVisibility(View.INVISIBLE);
+//        locationDetailsCard.setVisibility(View.INVISIBLE);
 
         FrameLayout previewLayout = findViewById(R.id.cameraPreview);
 //        if(checkCameraHardware(this)) {
