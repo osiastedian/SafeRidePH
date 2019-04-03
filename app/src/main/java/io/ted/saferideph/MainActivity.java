@@ -36,6 +36,9 @@ import com.google.firebase.database.ValueEventListener;
 import java.util.ArrayList;
 import java.util.Locale;
 
+import io.ted.saferideph.models.Camera2Preview;
+import io.ted.saferideph.models.Camera2TextureView;
+
 import static io.ted.saferideph.SafeRide.MINIMUM_ZOOM_PREF;
 import static io.ted.saferideph.SettingsActivity.BUNDLE_BUMP_THRESHOLD;
 import static io.ted.saferideph.SettingsActivity.BUNDLE_BUMP_VOICE_OUT;
@@ -128,7 +131,8 @@ public class MainActivity extends AppCompatActivity implements
 
     private Camera mCamera;
     CameraPreview mPreview;
-
+    Camera2TextureView mCamera2TextureView;
+    Camera2Preview mCamera2Preview;
 
 
 
@@ -200,14 +204,21 @@ public class MainActivity extends AppCompatActivity implements
         // DEBUG
 //        locationDetailsCard.setVisibility(View.INVISIBLE);
 
-        FrameLayout previewLayout = findViewById(R.id.cameraPreview);
+//        FrameLayout previewLayout = findViewById(R.id.cameraPreview);
 //        if(checkCameraHardware(this)) {
-            this.mCamera = getCameraInstance();
-            mPreview = new CameraPreview(this, mCamera);
-            previewLayout.addView(mPreview);
+//            this.mCamera = getCameraInstance();
+//            mPreview = new CameraPreview(this, mCamera);
+//            previewLayout.addView(mPreview);
 //        } else {
 //         previewLayout.setVisibility(View.INVISIBLE);
 //        }
+        mCamera2TextureView = findViewById(R.id.cameraPreview);
+        try {
+            mCamera2Preview = new Camera2Preview(this, this, mCamera2TextureView);
+        } catch (Exception e) {
+
+        }
+
     }
 
     private void loadTripsValueListener() {
@@ -268,7 +279,8 @@ public class MainActivity extends AppCompatActivity implements
         mapView.onResume();
         compass.start();
         bumpDetectionSystem.start();
-        this.mPreview.setCamera(getCameraInstance());
+        mCamera2Preview.onResume();
+//        this.mPreview.setCamera(getCameraInstance());
 
     }
 
@@ -293,7 +305,8 @@ public class MainActivity extends AppCompatActivity implements
         mapView.onPause();
         compass.stop();
         bumpDetectionSystem.stop();
-        releaseCamera();
+        mCamera2Preview.onPause();
+//        releaseCamera();
         super.onPause();
     }
 

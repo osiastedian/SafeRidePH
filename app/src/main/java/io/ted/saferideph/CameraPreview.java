@@ -8,7 +8,7 @@ import android.view.SurfaceView;
 
 import java.io.IOException;
 
-public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback {
+public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback, Camera.PreviewCallback {
 
     public static final String TAG = "CameraPreview";
 
@@ -28,6 +28,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
     public void surfaceCreated(SurfaceHolder holder) {
         try {
             camera.setPreviewDisplay(holder);
+            camera.setPreviewCallback(this);
 //            camera.setDisplayOrientation(90);
             camera.startPreview();
         } catch (IOException e) {
@@ -37,7 +38,7 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 
     @Override
     public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-
+        Log.i("Surface Holder", "received surfce");
         if (holder.getSurface() == null){
             return;
         }
@@ -94,5 +95,11 @@ public class CameraPreview extends SurfaceView implements SurfaceHolder.Callback
 
             this.camera = null;
         }
+    }
+
+
+    @Override
+    public void onPreviewFrame(byte[] data, Camera camera) {
+
     }
 }

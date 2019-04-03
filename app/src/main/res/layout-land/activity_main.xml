@@ -18,16 +18,23 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <FrameLayout
+        <io.ted.saferideph.models.Camera2TextureView
+            android:layout_alignParentTop="true"
+            android:layout_alignParentBottom="true"
             android:id="@+id/cameraPreview"
             android:layout_width="match_parent"
-            android:layout_height="match_parent">
-        </FrameLayout>
+            android:layout_height="match_parent" />
+
+        <!--<FrameLayout-->
+        <!--android:id="@+id/cameraPreview"-->
+        <!--android:layout_width="match_parent"-->
+        <!--android:layout_height="match_parent">-->
+        <!--</FrameLayout>-->
 
         <com.google.android.gms.maps.MapView
             android:id="@+id/mapView"
-            android:layout_width="150dp"
-            android:layout_height="150dp"
+            android:layout_width="200dp"
+            android:layout_height="200dp"
             android:layout_below="@id/zoomSeekBar"
             android:layout_alignParentEnd="true"
             android:layout_alignParentBottom="false" />
@@ -45,7 +52,7 @@
     </RelativeLayout>
 
     <RelativeLayout
-        android:layout_width="800px"
+        android:layout_width="700px"
         android:layout_height="match_parent">
 
         <android.support.v7.widget.CardView
@@ -231,18 +238,18 @@
             style="?metaButtonBarStyle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
             android:layout_gravity="bottom|center_horizontal"
             android:background="@color/black_overlay"
-            android:layout_alignParentBottom="true"
             android:orientation="horizontal"
             tools:ignore="UselessParent">
             <!--<Button-->
-                <!--android:id="@+id/testButton"-->
-                <!--android:layout_width="0dp"-->
-                <!--android:layout_height="wrap_content"-->
-                <!--android:layout_weight="1"-->
-                <!--android:onClick="onTest"-->
-                <!--android:text="TEST" />-->
+            <!--android:id="@+id/testButton"-->
+            <!--android:layout_width="0dp"-->
+            <!--android:layout_height="wrap_content"-->
+            <!--android:layout_weight="1"-->
+            <!--android:onClick="onTest"-->
+            <!--android:text="TEST" />-->
         </LinearLayout>
 
     </RelativeLayout>

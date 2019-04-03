@@ -42,11 +42,13 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 import io.ted.saferideph.models.Bump;
 import io.ted.saferideph.models.Trip;
@@ -111,7 +113,7 @@ public class SafeRide implements
     private BumpDetectionSystem bumpDetectionSystem;
 
     private ArrayList<Circle> nearbyPlacesCircles = new ArrayList<>();
-    private ArrayList<Marker> nearbyScannedMarkers = new ArrayList<>();
+    private ArrayList<Circle> nearbyScannedMarkers = new ArrayList<>();
     private ArrayList<Circle> bumpsScannedCircles = new ArrayList<>();
 
     private ArrayList<NearbyPlace> nearbyPlacesCollection = new ArrayList<>();
@@ -574,34 +576,29 @@ public class SafeRide implements
 
     public void addNearbyMarkers(List<NearbyPlace> places) {
         if(places != null) {
-            for (NearbyPlace place : places) {
+            for (final NearbyPlace place : places) {
                 if (!nearbyPlacesCollection.contains(place)) {
                     nearbyPlacesCollection.add(place);
+                    ownerActivity.runOnUiThread(() -> {
+                        CircleOptions nearbyMarkerOptions = new CircleOptions().center(place.createLatLng()).radius(5).strokeColor(Color.GREEN).fillColor(Color.GREEN);
+                        Circle marker = mMap.addCircle(nearbyMarkerOptions);
+                        nearbyScannedMarkers.add(marker);
+                    });
                 }
             }
         }
-        // Filter Nearby places within radius
+        nearbyScannedMarkers.stream()
+            .peek(circle -> circle.setFillColor(Color.BLACK))
+            .filter(circle -> {
+                final LatLng center = circle.getCenter();
+                NearbyPlace[] filteredPlaces = (NearbyPlace[])nearbyPlacesCollection.stream().filter(place -> {
+                    LatLng placeLatLng = place.createLatLng();
+                    return placeLatLng.latitude == center.latitude && placeLatLng.longitude == center.longitude;
+                }).toArray();
+                return filteredPlaces != null && filteredPlaces.length > 0;
+            }).peek(circle -> circle.setFillColor(Color.GREEN));
 
-        ArrayList<NearbyPlace> scannedPlaces = new ArrayList<>();
-        for (NearbyPlace pos :
-                nearbyPlacesCollection) {
-            if(this.lastScanArea != null
-                    && isPointOnScanArea(pos.createLatLng())
-                ) {
-                scannedPlaces.add(pos);
-                if(mMap != null) {
-                    Marker marker = mMap.addMarker(new MarkerOptions().position(pos.createLatLng()).title(pos.getName() + "_" + joinStringArray(pos.getTypes(), ",")));
-                    nearbyScannedMarkers.add(marker);
-                }
-            } else {
-                CircleOptions options = new CircleOptions().center(pos.createLatLng()).radius(5).strokeColor(Color.BLACK).fillColor(Color.BLACK);
-                if(mMap != null) {
-                    Circle marker = mMap.addCircle(options);
-                    nearbyPlacesCircles.add(marker);
-                }
-            }
-        }
-
+        ArrayList<NearbyPlace> scannedPlaces = nearbyPlacesCollection.stream().filter(nearbyPlace -> isPointOnScanArea(nearbyPlace.createLatLng())).collect(Collectors.toCollection(ArrayList::new));
         for(SafeRideListener listener: mListener) {
             listener.onScannedPlaces(scannedPlaces);
         }
@@ -609,6 +606,64 @@ public class SafeRide implements
             processScannedPlaces(scannedPlaces);
         }
     }
+
+//    public void addNearbyMarkers(List<NearbyPlace> places) {
+//        if(places != null) {
+//            for (NearbyPlace place : places) {
+//                if (!nearbyPlacesCollection.contains(place)) {
+//                    nearbyPlacesCollection.add(place);
+//                }
+//            }
+//        }
+//        // Filter Nearby places within radius
+//
+//        ArrayList<NearbyPlace> scannedPlaces = new ArrayList<>();
+//
+//        for (final NearbyPlace pos :
+//                nearbyPlacesCollection) {
+//            if(this.lastScanArea != null
+//                    && isPointOnScanArea(pos.createLatLng())
+//                ) {
+//                scannedPlaces.add(pos);
+//                if(mMap != null) {
+//                    ownerActivity.runOnUiThread(new Runnable() {
+//                        @Override
+//                        public void run() {
+//                            CircleOptions nearbyMarkerOptions = new CircleOptions().center(pos.createLatLng()).radius(5).strokeColor(Color.GREEN).fillColor(Color.GREEN);
+//                            Circle marker = mMap.addCircle(nearbyMarkerOptions);
+//                            nearbyScannedMarkers.add(marker);
+//                        }
+//                    });
+////                    ownerActivity.runOnUiThread(new Runnable() {
+////                        @Override
+////                        public void run() {
+////                            Marker marker = mMap.addMarker(new MarkerOptions().position(pos.createLatLng()).title(pos.getName() + "_" + joinStringArray(pos.getTypes(), ",")));
+////                            nearbyScannedMarkers.add(marker);
+////                        }
+////                    });
+//                }
+//            } else {
+//                final CircleOptions options = new CircleOptions().center(pos.createLatLng()).radius(5).strokeColor(Color.BLACK).fillColor(Color.BLACK);
+//                if(mMap != null) {
+//                    ownerActivity.runOnUiThread(new Runnable() {
+//                        @Override
+//                        public void run() {
+//                            Circle marker = mMap.addCircle(options);
+//                            nearbyPlacesCircles.add(marker);
+//                        }
+//                    });
+//
+//                }
+//            }
+//        }
+//
+//        for(SafeRideListener listener: mListener) {
+//            listener.onScannedPlaces(scannedPlaces);
+//        }
+//        if(scannedPlaces.size() > 0) {
+//            processScannedPlaces(scannedPlaces);
+//        }
+//    }
 
     private void processScannedPlaces(ArrayList<NearbyPlace> places) {
         NearbyPlace mostPopulatedPlace = null;
@@ -639,10 +694,10 @@ public class SafeRide implements
         Log.i("Warning Highest", mostPopulatedPlace.getName()+" : "+highestScore);
         Log.i("Warning Highest Dist", mostPopulatedPlace.getName()+" : "+distance);
         double speed = this.lastSpeed;
-        updateSpeedLimit(totalScore);
-        if(shouldSlowDownUpcomingPlace(nearestPlaceDistance, speed)) {
-            warningSystem.getSlowUpComing(nearestPlace.getName(), ScoringSystem.getHighscorePlaceType(nearestPlace), distance);
-        }
+//        updateSpeedLimit(totalScore);
+//        if(shouldSlowDownUpcomingPlace(nearestPlaceDistance, speed)) {
+//            warningSystem.getSlowUpComing(nearestPlace.getName(), ScoringSystem.getHighscorePlaceType(nearestPlace), distance);
+//        }
     }
 
     private void updateSpeedLimit(long score){
@@ -720,7 +775,7 @@ public class SafeRide implements
         }
         nearbyPlacesCircles.clear();
 
-        for (Marker place :
+        for (Circle place :
                 nearbyScannedMarkers) {
             place.remove();
         }
