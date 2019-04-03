@@ -85,6 +85,9 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
     Handler mBackgroundHandler;
     HandlerThread mBackgroundThread;
 
+    Handler previewHandler;
+    HandlerThread previewHandlerThread;
+
     private TextureView.SurfaceTextureListener mSurfaceTextureListener
             = new TextureView.SurfaceTextureListener() {
 
@@ -124,6 +127,7 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
 
     public void onResume() {
         startBackgroundThread();
+        startPreviewThread();
         if (mContainer.isAvailable()) {
             openCamera(mContainer.getWidth(), mContainer.getHeight());
         } else {
@@ -133,6 +137,7 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
 
     public void onPause() {
         closeCamera();
+        stopPreviewThread();
         stopBackgroundThread();
     }
 
@@ -154,8 +159,8 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
                 throw new RuntimeException("Cannot get available preview/video sizes");
             }
 
-            mVideoSize = new Size(mContainer.getWidth(), mContainer.getHeight());// chooseVideoSize(streamConfigurationMap.getOutputSizes((MediaRecorder.class)));
-            mPreviewSize =  new Size(mContainer.getWidth(), mContainer.getHeight()); //chooseOptimalSize(streamConfigurationMap.getOutputSizes(SurfaceTexture.class),width, height, mVideoSize);
+            mVideoSize = chooseVideoSize(streamConfigurationMap.getOutputSizes((MediaRecorder.class)));
+            mPreviewSize = new Size(mContainer.getWidth(), mContainer.getHeight()); //chooseOptimalSize(streamConfigurationMap.getOutputSizes(SurfaceTexture.class),width, height, mVideoSize);
 
             int orientation = this.mContext.getResources().getConfiguration().orientation;
             if (orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -193,7 +198,7 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
                         activity.finish();
                     }
                 }
-            }, null);
+            }, mBackgroundHandler);
         } catch (CameraAccessException cameraAc) {
 
         } catch (InterruptedException interupt) {
@@ -222,7 +227,7 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
 
     private static Size chooseVideoSize(Size[] choices) {
         for (Size size : choices) {
-            if (size.getWidth() == size.getHeight() * 4 / 3 && size.getWidth() <= 1080) {
+            if (size.getWidth() == size.getHeight() * 16 / 9){// && size.getWidth() <= 1080) {
                 return size;
             }
         }
@@ -304,6 +309,7 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     mPreviewSession = session;
+                    startPreviewThread();
                     updatePreview();
                 }
 
@@ -329,9 +335,7 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
         }
         try {
             setUpCaptureRequestBuilder(mPreviewBuilder);
-            HandlerThread thread = new HandlerThread("CameraPreview");
-            thread.start();
-            mPreviewSession.setRepeatingRequest(mPreviewBuilder.build(), null, mBackgroundHandler);
+            mPreviewSession.setRepeatingRequest(mPreviewBuilder.build(), null, previewHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -440,6 +444,22 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
             mBackgroundThread.join();
             mBackgroundThread = null;
             mBackgroundHandler = null;
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void startPreviewThread() {
+        previewHandlerThread = new HandlerThread("Camera2Preview Handler");
+        previewHandlerThread.start();
+        previewHandler = new Handler(previewHandlerThread.getLooper());
+    }
+    private void stopPreviewThread() {
+        previewHandlerThread.quitSafely();
+        try {
+            previewHandlerThread.join();
+            previewHandlerThread = null;
+            previewHandler = null;
         } catch (InterruptedException e) {
             e.printStackTrace();
         }

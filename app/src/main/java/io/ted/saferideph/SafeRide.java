@@ -457,7 +457,7 @@ public class SafeRide implements
 
         this.clearNearbyMarkers();
         this.clearBumpCircles();
-        this.addNearbyMarkers(null);
+//        this.addNearbyMarkers(null); // Todo: Find a way to reduce lag when rendering the points
         this.loadScannedBumps(bumpDetectionSystem.getBumpsMap());
     }
 

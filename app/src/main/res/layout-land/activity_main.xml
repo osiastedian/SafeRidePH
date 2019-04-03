@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -16,7 +16,9 @@
 
     <RelativeLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="match_parent"
+        android:layout_alignParentLeft="true"
+    >
 
         <io.ted.saferideph.models.Camera2TextureView
             android:layout_alignParentTop="true"
@@ -31,39 +33,112 @@
         <!--android:layout_height="match_parent">-->
         <!--</FrameLayout>-->
 
-        <com.google.android.gms.maps.MapView
-            android:id="@+id/mapView"
-            android:layout_width="200dp"
-            android:layout_height="200dp"
-            android:layout_below="@id/zoomSeekBar"
-            android:layout_alignParentEnd="true"
-            android:layout_alignParentBottom="false" />
+        <android.support.v7.widget.CardView
+            android:id="@+id/speedCard"
+            android:layout_width="700px"
+            android:layout_height="wrap_content"
+            android:layout_alignParentTop="true"
+            android:layout_marginLeft="5dp"
+            android:layout_marginRight="5dp"
+            android:layout_marginTop="10dp"
+            android:alpha="0.75"
+        >
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:paddingBottom="10dp"
+                android:paddingTop="10dp">
+
+                <TextView
+                    android:id="@+id/speedTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 km/h"
+                    android:textSize="40sp" />
+
+                <TextView
+                    android:id="@+id/excessSpeedTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_toEndOf="@id/speedTextView"
+                    android:gravity="center"
+                    android:textColor="@android:color/white"
+                    android:textSize="40sp" />
+            </RelativeLayout>
+
+        </android.support.v7.widget.CardView>
+
+        <android.support.v7.widget.CardView
+            android:id="@+id/speedLimitCard"
+            android:layout_width="680px"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/speedCard"
+            android:layout_marginLeft="10dp"
+            android:layout_marginRight="10dp"
+            app:cardBackgroundColor="@color/cardview_dark_background"
+            android:alpha="0.75">
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:paddingBottom="10dp"
+                android:paddingTop="10dp">
+
+                <TextView
+                    android:id="@+id/speedLimitTextView"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Limit: 0km/h"
+                    android:textColor="@android:color/white"
+                    android:textSize="30sp" />
+            </RelativeLayout>
+        </android.support.v7.widget.CardView>
+    </RelativeLayout>
+
+    <RelativeLayout
+        android:layout_width="700px"
+        android:layout_height="match_parent"
+        android:layout_alignParentRight="true"
+        android:alpha="0.75"
+    >
 
         <SeekBar
             android:id="@+id/zoomSeekBar"
             style="@style/Widget.AppCompat.SeekBar.Discrete"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_alignStart="@+id/mapView"
+            android:layout_alignParentStart="true"
             android:max="6"
             android:padding="0dp"
             android:paddingBottom="0dp"
             android:progress="0" />
-    </RelativeLayout>
 
-    <RelativeLayout
-        android:layout_width="700px"
-        android:layout_height="match_parent">
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/zoomSeekBar"
+            android:layout_above="@id/locationDetailsCard"
+
+        >
+            <com.google.android.gms.maps.MapView
+                android:id="@+id/mapView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+             />
+        </RelativeLayout>
 
         <android.support.v7.widget.CardView
             android:id="@+id/locationDetailsCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignParentBottom="true"
+            android:layout_marginBottom="5dp"
+            android:layout_marginEnd="5dp"
             android:layout_marginStart="5dp"
             android:layout_marginTop="5dp"
-            android:layout_marginEnd="5dp"
-            android:layout_marginBottom="5dp"
             app:cardBackgroundColor="@color/cardview_dark_background">
 
             <RelativeLayout
@@ -130,8 +205,8 @@
                 <LinearLayout
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:layout_alignParentTop="true"
                     android:layout_alignParentRight="true"
+                    android:layout_alignParentTop="true"
                     android:orientation="vertical">
 
                     <Button
@@ -165,67 +240,6 @@
             </RelativeLayout>
         </android.support.v7.widget.CardView>
 
-        <android.support.v7.widget.CardView
-            android:id="@+id/speedLimitCard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_below="@id/speedCard"
-            android:layout_marginLeft="10dp"
-            android:layout_marginRight="10dp"
-            app:cardBackgroundColor="@color/cardview_dark_background">
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:gravity="center"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp">
-
-                <TextView
-                    android:id="@+id/speedLimitTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Limit: 0km/h"
-                    android:textColor="@android:color/white"
-                    android:textSize="30sp" />
-            </RelativeLayout>
-        </android.support.v7.widget.CardView>
-
-        <android.support.v7.widget.CardView
-            android:id="@+id/speedCard"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_alignParentTop="true"
-            android:layout_marginLeft="5dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginRight="5dp">
-
-            <RelativeLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:paddingTop="10dp"
-                android:paddingBottom="10dp">
-
-                <TextView
-                    android:id="@+id/speedTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0 km/h"
-                    android:textSize="40sp" />
-
-                <TextView
-                    android:id="@+id/excessSpeedTextView"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_toEndOf="@id/speedTextView"
-                    android:gravity="center"
-                    android:textColor="@android:color/white"
-                    android:textSize="40sp" />
-            </RelativeLayout>
-
-        </android.support.v7.widget.CardView>
-
     </RelativeLayout>
 
     <RelativeLayout
@@ -254,4 +268,4 @@
 
     </RelativeLayout>
 
-</FrameLayout>
+</RelativeLayout>
