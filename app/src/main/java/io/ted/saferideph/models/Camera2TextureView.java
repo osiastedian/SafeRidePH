@@ -21,6 +21,11 @@ public class Camera2TextureView extends TextureView {
         super(context, attrs, defStyleAttr);
     }
 
+    /*
+    *
+    * Set Aspect Ratio
+    *
+    * */
     public void setAspectRatio(int width, int height) {
         if (width < 0 || height < 0) {
             throw new IllegalArgumentException("Size cannot be negative.");
