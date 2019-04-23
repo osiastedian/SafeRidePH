@@ -32,17 +32,21 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 public class Camera2Preview implements TextureView.SurfaceTextureListener {
-
+    private static final int PERMISSION_REQUEST = 0x0111;
     private static final String[] VIDEO_PERMISSIONS = {
             Manifest.permission.CAMERA,
             Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE
     };
     private static final String TAG = "Camera2Preview";
     private static final SparseIntArray DEFAULT_ORIENTATIONS = new SparseIntArray();
@@ -121,11 +125,11 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
         mContext = context;
         mContainer = container;
         cameraManager = (CameraManager) context.getSystemService(Context.CAMERA_SERVICE);
-        setCameraCharacteristics();
         container.setSurfaceTextureListener(this);
     }
 
     public void onResume() {
+        this.checkPermissions();
         startBackgroundThread();
         startPreviewThread();
         if (mContainer.isAvailable()) {
@@ -141,10 +145,25 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
         stopBackgroundThread();
     }
 
+    public boolean checkPermissions() {
+        
+        List<String> filtered  = Arrays.stream(VIDEO_PERMISSIONS)
+            .filter(permission -> ActivityCompat.checkSelfPermission(mContext, permission) != PackageManager.PERMISSION_GRANTED )
+            .collect(Collectors.toList());
+        
+        if (filtered.size() > 0 ) {
+            ActivityCompat.requestPermissions(mActivity, filtered.toArray(new String[filtered.size()]), PERMISSION_REQUEST);
+            return false;
+        }
+
+        return true;
+    }
+
 
     @SuppressLint("MissingPermission")
     private void openCamera(int width, int height) {
         try {
+            if(!checkPermissions()) return;
             if(cameraManager == null) {
                 cameraManager = (CameraManager) mContext.getSystemService(Context.CAMERA_SERVICE);
             }
@@ -169,7 +188,6 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
                 this.mContainer.setAspectRatio(mPreviewSize.getHeight(), mPreviewSize.getWidth());
             }
 
-            mMediaRecorder = new MediaRecorder();
             this.cameraManager.openCamera(cameraId, new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
@@ -254,42 +272,6 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
         }
     }
 
-
-    private boolean hasPermissionsGranted(String[] permissions) {
-        for (String permission : permissions) {
-            if (ActivityCompat.checkSelfPermission(this.mContext, permission)
-                    != PackageManager.PERMISSION_GRANTED) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void requestVideoPermissions() {
-        if (shouldShowRequestPermissionRationale(VIDEO_PERMISSIONS)) {
-
-        } else {
-        }
-    }
-
-    private boolean shouldShowRequestPermissionRationale(String[] permissions) {
-
-        return false;
-    }
-
-    private void setCameraCharacteristics() {
-        try {
-
-            for( String cameraId: cameraManager.getCameraIdList()) {
-                CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(cameraId);
-
-            }
-
-        } catch (Exception ex) {
-
-        }
-    }
-
     void startPreview() {
         if(null == mCameraDevice || !mContainer.isAvailable() || null == mPreviewSize) {
             return;
@@ -297,20 +279,31 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
 
         try {
             closePreviewSession();
+            mMediaRecorder = new MediaRecorder();
             setUpMediaRecorder();
             SurfaceTexture texture = mContainer.getSurfaceTexture();
             assert texture != null;
             texture.setDefaultBufferSize(mPreviewSize.getWidth(), mPreviewSize.getHeight());
             mPreviewBuilder = mCameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+            List<Surface> surfaces = new ArrayList<>();
 
             Surface previewSurface = new Surface(texture);
+            surfaces.add(previewSurface);
             mPreviewBuilder.addTarget(previewSurface);
-            mCameraDevice.createCaptureSession(Collections.singletonList(previewSurface), new CameraCaptureSession.StateCallback() {
+
+            Surface recordSurface = mMediaRecorder.getSurface();
+            surfaces.add(recordSurface);
+            mPreviewBuilder.addTarget(recordSurface);
+
+            mCameraDevice.createCaptureSession(surfaces, new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(@NonNull CameraCaptureSession session) {
                     mPreviewSession = session;
                     startPreviewThread();
                     updatePreview();
+                    mActivity.runOnUiThread(() -> {
+                        mMediaRecorder.start();
+                    });
                 }
 
                 @Override
@@ -335,7 +328,7 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
         }
         try {
             setUpCaptureRequestBuilder(mPreviewBuilder);
-            mPreviewSession.setRepeatingRequest(mPreviewBuilder.build(), null, previewHandler);
+            mPreviewSession.setRepeatingRequest(mPreviewBuilder.build(), null, mBackgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
@@ -350,6 +343,10 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
             mPreviewSession.close();
             mPreviewSession = null;
         }
+        if(mMediaRecorder != null) {
+            mMediaRecorder.stop();
+            mMediaRecorder.reset();
+        }
     }
 
     private void setUpMediaRecorder() throws IOException {
@@ -357,18 +354,18 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
         if (null == context) {
             return;
         }
-//        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+        mMediaRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         mMediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
         mMediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
         if (mNextVideoAbsolutePath == null || mNextVideoAbsolutePath.isEmpty()) {
             mNextVideoAbsolutePath = getVideoFilePath(this.mContext);
         }
         mMediaRecorder.setOutputFile(mNextVideoAbsolutePath);
-        mMediaRecorder.setVideoEncodingBitRate(10000000);
-        mMediaRecorder.setVideoFrameRate(30);
-        mMediaRecorder.setVideoSize(mVideoSize.getWidth(), mVideoSize.getHeight());
+//        mMediaRecorder.setVideoEncodingBitRate(10000000);
+//        mMediaRecorder.setVideoFrameRate(30);
+//        mMediaRecorder.setVideoSize(mVideoSize.getWidth(), mVideoSize.getHeight());
         mMediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-//        mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
+        mMediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC);
         int rotation = mActivity.getWindowManager().getDefaultDisplay().getRotation();
         switch (mSensorOrientation) {
             case SENSOR_ORIENTATION_DEFAULT_DEGREES:
@@ -386,7 +383,6 @@ public class Camera2Preview implements TextureView.SurfaceTextureListener {
         return (dir == null ? "" : (dir.getAbsolutePath() + "/"))
                 + System.currentTimeMillis() + ".mp4";
     }
-
 
 
     @Override

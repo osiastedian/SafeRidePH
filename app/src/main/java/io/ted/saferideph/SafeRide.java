@@ -353,6 +353,7 @@ public class SafeRide implements
             ActivityCompat.requestPermissions(this.ownerActivity, new String[]{Manifest.permission.ACCESS_FINE_LOCATION}, MY_PERMISSIONS_REQUEST_LOCATION );
             return false;
         }
+
         return true;
     }
 

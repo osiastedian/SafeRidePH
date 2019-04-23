@@ -215,6 +215,7 @@ public class MainActivity extends AppCompatActivity implements
         mCamera2TextureView = findViewById(R.id.cameraPreview);
         try {
             mCamera2Preview = new Camera2Preview(this, this, mCamera2TextureView);
+            mCamera2Preview.checkPermissions();
         } catch (Exception e) {
 
         }
